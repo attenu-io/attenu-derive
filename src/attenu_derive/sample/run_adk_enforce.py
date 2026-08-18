@@ -60,7 +60,7 @@ def tool_authorities(agent, domain: dict):
     return out
 
 
-def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float):
+def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float, hold: set[str] | None = None):
     import asyncio
     from google.adk.agents.run_config import RunConfig
     from google.adk.apps.app import App
@@ -76,6 +76,9 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     tools_by_agent, subs_by_agent = declared_suites(root_agent)
 
     inst = installation_authority(domain, grants)
+    hold = hold or set()
+    if hold:                                            # demo lever: force these scopes OUT of the installation authority (an operator who did not enable them)
+        inst = Authority(set(inst.scopes) - hold, inst.ceilings, ttl=None)
     # sub-agents (multi-agent apps): each is delegated the installation authority, meet-narrowed by the chain.
     delegations = {a.name: inst for a in agents if a is not root_agent}
     if delegations:
@@ -110,8 +113,20 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     except Exception as exc:                                          # noqa: BLE001
         tool_calls, denials = [], [{"error": f"{type(exc).__name__}: {str(exc)[:120]}"}]
 
+    # delegation graph: parent + child derived authorities (proves child ⊆ parent)
+    graph = {}
+    for a in agents:
+        try:
+            g = plugin.guard_for(a.name)
+        except (KeyError, Exception):                   # an agent that did not run this session was never minted a Guard
+            g = None
+        if g is not None:
+            graph[a.name] = {"scopes": sorted(g.authority.scopes),
+                             "narrower_than_root": g.is_narrower_than(root_guard) if a is not root_agent else None,
+                             "parent": next((x.get("parent") for x in root_guard.audit_log().entries if x.get("event") == "spawn" and x.get("agent") == a.name), None)}
     entries = root_guard.audit_log().entries
     ledger_denies = [e for e in entries if e.get("event") == "deny"]
+    spawns = [e for e in entries if e.get("event") == "spawn"]
     signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor")
     anchor = root_guard.audit_log().anchor(signer)
     from delegation_guard import AuditLog
@@ -120,7 +135,8 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
             "installation_scopes": sorted(inst.scopes), "stubbed_tools": changed["stubbed_tools"],
             "tool_calls": tool_calls, "denials_returned_to_model": denials,
             "ledger_deny_events": [{"scope": e.get("scope"), "tool": e.get("tool"), "reason": e.get("reason")} for e in ledger_denies],
-            "ledger_entries": len(entries), "anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok}}
+            "ledger_entries": len(entries), "delegation_graph": graph, "spawns": [{"agent": e.get("agent"), "parent": e.get("parent")} for e in spawns],
+            "anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0}}
 
 
 def main(argv=None) -> int:
@@ -129,13 +145,14 @@ def main(argv=None) -> int:
     ap.add_argument("--domain", required=True); ap.add_argument("--grant", action="append", default=[], help="a scope the operator enabled (repeatable)")
     ap.add_argument("--model", default="anthropic/claude-haiku-4-5-20251001")
     ap.add_argument("--max-llm-calls", type=int, default=20); ap.add_argument("--timeout-s", type=float, default=180.0)
+    ap.add_argument("--hold", action="append", default=[], help="a scope to force OUT of the installation authority (demo: operator did not enable it)")
     ap.add_argument("--out", default=None, help="write the evidence JSON here")
     args = ap.parse_args(argv)
     os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "FALSE")
     if not args.model.startswith("gemini") and not os.environ.get("ANTHROPIC_API_KEY"):
         print("ANTHROPIC_API_KEY not set", file=sys.stderr); return 2
     rep = run(Path(args.app), args.prompt, domain_name=args.domain, grants=set(args.grant), model=args.model,
-              max_llm_calls=args.max_llm_calls, timeout_s=args.timeout_s)
+              max_llm_calls=args.max_llm_calls, timeout_s=args.timeout_s, hold=set(args.hold))
     out = json.dumps(rep, indent=2)
     if args.out:
         Path(args.out).write_text(out)
