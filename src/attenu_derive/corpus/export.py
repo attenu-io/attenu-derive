@@ -68,7 +68,7 @@ def audit_to_corpus_rows(entries: Iterable[Mapping], *, run: Mapping, task_text_
             "event_id": f"{run.get('project','?')}:{run.get('framework','?')}:{node}",
             "source": "observed",
             "project": run.get("project"), "framework": run.get("framework"),
-            "run": {k: run[k] for k in ("model", "seed", "versions") if k in run},
+            "run": {k: run[k] for k in ("model", "seed", "versions", "task_index") if k in run},
             "node": node, "parent_node": parent, "agent": agent,
             "task_hash": hashlib.sha256(f"{salt}\x1f{task or ''}".encode()).hexdigest()[:16] if task is not None else None,
             "task_features": _task_features(task) if task is not None else None,
