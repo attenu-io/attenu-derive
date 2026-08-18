@@ -46,10 +46,12 @@ def shadow(rows: list[dict], deriver: Deriver | None = None, cat: dict | None = 
     negatives_by_node = {node: {tool,...}} from the rubric (gold): calls the label marks as over-reach. A block on one of
     those is `blocked_overreach` (a block we WANT), not a would-be benign block; without the join every block counts as benign."""
     deriver = deriver or Deriver(); cat = cat or load_catalog(); negatives_by_node = negatives_by_node or {}
-    derived: dict[str, object] = {}; proposals: dict[str, object] = {}; recs: dict[str, object] = {}
+    derived: dict = {}; proposals: dict = {}; recs: dict = {}
     blocks: list[dict] = []; overreach: list[dict] = []; calls = 0; by_layer = Counter()
+    def key(r, n):                                   # node ids restart per TASK inside a run file: key by (task, node)
+        return ((r.get("run") or {}).get("task_index"), n)
     for r in rows:                                   # file order = spawn order: parents precede children
-        node = r["node"]; parent = r.get("parent_node")
+        node = key(r, r["node"]); parent = key(r, r.get("parent_node")) if r.get("parent_node") else None
         ev = event_from_row(r, task_text=r.get("task") or "")
         ev = replace(ev, parent_authority=derived[parent] if parent in derived else OBSERVE_PARENT)   # REAL chain
         granted, rec = deriver.propose(ev)
@@ -70,16 +72,16 @@ def shadow(rows: list[dict], deriver: Deriver | None = None, cat: dict | None = 
             if ok:
                 continue
             own = proposal.permits(sc, ctx)
-            entry = {"node": node, "agent": r.get("agent"), "parent": parent, "tool": tool, "scope": sc,
+            entry = {"node": node[1], "task_index": node[0], "agent": r.get("agent"), "parent": parent[1] if parent else None, "tool": tool, "scope": sc,
                      "reasons": [x.code for x in ok.reasons], "cause": "parent-chain" if own else "proposal",
                      "layer": rec.layer, "template": rec.template,
                      "parent_scopes": sorted(derived[parent].scopes) if parent in derived else None}
-            (overreach if tool in negatives_by_node.get(node, set()) else blocks).append(entry)
+            (overreach if tool in negatives_by_node.get(node[1], set()) else blocks).append(entry)
     return {"nodes": len(rows), "calls": calls, "would_block": len(blocks), "blocked_overreach": len(overreach),
             "would_block_rate": round(len(blocks) / calls, 4) if calls else None,
             "by_scope": dict(Counter(b["scope"] for b in blocks)), "by_cause": dict(Counter(b["cause"] for b in blocks)),
             "by_layer": dict(by_layer), "by_agent": dict(Counter(b["agent"] for b in blocks)),
-            "derived": {n: {"scopes": sorted(a.scopes), "layer": recs[n].layer, "template": recs[n].template} for n, a in derived.items()},
+            "derived": {f"{n[0]}:{n[1]}": {"scopes": sorted(a.scopes), "layer": recs[n].layer, "template": recs[n].template} for n, a in derived.items()},
             "blocks": blocks, "overreach": overreach}
 
 

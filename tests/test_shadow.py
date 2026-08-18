@@ -34,7 +34,7 @@ def test_shadow_child_reads_survive_only_if_the_parent_holds_the_read_family():
     every child read is a would-be block with cause 'parent-chain' — even though the child's OWN proposal allows it."""
     rep = shadow([ROOT, CHILD])
     child_blocks = [b for b in rep["blocks"] if b["node"] == "chain:n1"]
-    parent_holds_read = "fs.read" in rep["derived"]["chain:n0"]["scopes"]
+    parent_holds_read = "fs.read" in rep["derived"]["None:chain:n0"]["scopes"]     # derived keys are "<task>:<node>" (node ids restart per task)
     if parent_holds_read:
         assert child_blocks == []
     else:
