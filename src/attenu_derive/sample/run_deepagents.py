@@ -209,6 +209,7 @@ def main(argv=None) -> int:
         n_calls = sum(len(r["child_calls"]) for r in rows)
         n_deleg = sum(1 for r in rows if r["parent_node"] is not None)
         per_task.append({"task_index": i, "status": status, "seconds": round(time.time() - t0, 1),
+                         "aborted": status.startswith("error: BudgetExceeded"),
                          "delegations": n_deleg, "tool_calls": n_calls, "usage": usage,
                          "audit_events": len(entries)})
         print(f"[task {i}] {status} | delegations={n_deleg} tool_calls={n_calls} "
@@ -219,6 +220,7 @@ def main(argv=None) -> int:
     (out / "mirror" / f"{project}-deepagents-{run_id}.jsonl").write_text(
         "\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
     manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"},
+                "billing": "api", "guardrails": {"max_input_tokens": args.max_input_tokens, "recursion_limit": args.recursion_limit, "prompt_caching": True},
                 "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"] is not None),
                            "rows": len(corpus_rows),
