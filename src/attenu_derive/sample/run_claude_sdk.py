@@ -44,14 +44,35 @@ DEFAULT_TASKS = [
 ]
 
 
+SPECIALISTS = {   # T5 fan-out: one task -> several delegations (events per run x4 at the same subscription cost)
+    "researcher":        ("Explores the repository: lists, greps and reads files, and reports concise findings with file paths.",
+                          "You are a code researcher. Use Glob, Grep and Read to explore efficiently (few, targeted reads). Return concise findings with file paths. Do NOT write files."),
+    "security-reviewer": ("Finds security-relevant code paths (input parsing, file/network access, auth, escaping, secrets).",
+                          "You are a security reviewer. Use Glob, Grep and Read to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files."),
+    "test-analyst":      ("Explains how tests are organized and run.",
+                          "You analyse the test suite: locate tests, runners, CI config; report how to run them, with file paths. Do NOT write files."),
+    "api-surveyor":      ("Maps the public API surface and deprecations.",
+                          "You map the public API: entry points, exported functions/classes, deprecated items; report with file paths. Do NOT write files."),
+}
+FANOUT_TASKS = [
+    "Produce REPORT.md for this repository with four sections: architecture, security-relevant paths, tests, public API. "
+    "Delegate EACH section to its specialist subagent (researcher, security-reviewer, test-analyst, api-surveyor) via the Agent tool, "
+    "in parallel where possible; do all reading through them; then write REPORT.md yourself and finish.",
+    "Write ONBOARDING.md for a new contributor: how the code is organized (researcher), what to be careful about security-wise "
+    "(security-reviewer), how to run the tests (test-analyst), and which public APIs matter (api-surveyor). Delegate every "
+    "reading task to those subagents; write only the final file yourself.",
+    "Assess this repository for a security review: delegate exploration to the researcher and the security-reviewer, "
+    "ask the test-analyst whether security-relevant paths are covered by tests, and the api-surveyor which public APIs "
+    "expose those paths. Write SECURITY_ASSESSMENT.md yourself; do all reading through the subagents.",
+]
+
+
 def make_registry(salt: str):
     root = Guard.issue("orchestrator", OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     reg = DelegationGuardRegistry(
         root,
-        agent_grants={
-            "researcher": AgentGrant(OBSERVE, task="explore the repository and report findings"),
-            "general-purpose": AgentGrant(OBSERVE, task="general-purpose subagent"),
-        },
+        agent_grants={**{name: AgentGrant(OBSERVE, task=desc) for name, (desc, _p) in SPECIALISTS.items()},
+                      "general-purpose": AgentGrant(OBSERVE, task="general-purpose subagent")},
         tool_policies={"*": ToolPolicy("observe.tool", context_fn=lambda ti: extract_features(ti, salt=salt))},
     )
     return root, reg
@@ -79,15 +100,8 @@ async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: i
         allowed_tools=["Read", "Grep", "Glob", "Write", "Agent"],
         disallowed_tools=["Bash", "WebFetch", "WebSearch", "Edit", "NotebookEdit"],
         permission_mode="acceptEdits",                   # scratch checkout; Write is the task's output
-        agents={
-            "researcher": AgentDefinition(
-                description="Explores the repository: lists, greps and reads files, and reports concise findings with file paths.",
-                prompt=("You are a code researcher. Use Glob, Grep and Read to explore efficiently (few, targeted "
-                        "reads). Return concise findings with file paths and line references. Do NOT write files."),
-                tools=["Read", "Grep", "Glob"],
-                model=model,
-            )
-        },
+        agents={name: AgentDefinition(description=desc, prompt=prompt, tools=["Read", "Grep", "Glob"], model=model)
+                for name, (desc, prompt) in SPECIALISTS.items()},
         hooks=hooks,
         max_turns=max_turns,
         max_budget_usd=budget,
@@ -119,13 +133,14 @@ def main(argv=None) -> int:
     ap.add_argument("--project", default=None)
     ap.add_argument("--model", default="haiku")
     ap.add_argument("--tasks", default=None)
+    ap.add_argument("--fanout", action="store_true", help="use the fan-out task set (4 specialist subagents per task)")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-turns", type=int, default=40)
-    ap.add_argument("--budget-usd", type=float, default=1.0)
+    ap.add_argument("--budget-usd", type=float, default=3.0, help="SDK notional cap per task (subscription-billed)")
     args = ap.parse_args(argv)
 
     repo = Path(args.repo).resolve(); project = args.project or repo.name
-    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else DEFAULT_TASKS
+    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (FANOUT_TASKS if args.fanout else DEFAULT_TASKS)
     if args.limit:
         tasks = tasks[: args.limit]
     run_id = time.strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(3)
