@@ -1,8 +1,10 @@
-"""Generate gold labels from the local mirror. RUBRIC_VERSION=1 (default) applies the v1 rulings
+"""Generate gold labels from the local mirror. RUBRIC_VERSION=1.2 (default) applies the v1 rulings
 (prompt contradiction -> negatives; agent.message admitted; CallLimit(5) on orchestrator fs.write;
-researcher RowLimit(1000) role default). RUBRIC_VERSION=0 reproduces the historical v0 labels.
-    python -m attenu_derive.corpus.gold_v0                 # writes corpus/gold/gold-v1.jsonl, prints a table
-    RUBRIC_VERSION=0 python -m attenu_derive.corpus.gold_v0  # writes gold-v0.jsonl
+researcher RowLimit(1000) role default) plus ruling 7 (v1.2, T13): a parent HOLDS the read families its
+descendants used, marked `held_for_delegation`. RUBRIC_VERSION=1 / 0 reproduce the historical labels.
+    python -m attenu_derive.corpus.gold_v0                    # writes corpus/gold/gold-v1.2.jsonl, prints a table
+    RUBRIC_VERSION=1 python -m attenu_derive.corpus.gold_v0     # writes gold-v1.jsonl (frozen history)
+Every gold row carries node / parent_node / run_key so the G1 gate can score the REAL chain.
 """
 from __future__ import annotations
 import glob, json, os, re, sys
@@ -10,8 +12,10 @@ from pathlib import Path
 from attenu_derive.catalog.coverage import load_catalog, resolve
 
 QUP = {"0": 0, "1": 1, "2-10": 10, "11-100": 100, "101-1k": 1000, "1k-10k": 10_000, "10k-100k": 100_000, "100k-1M": 1_000_000, "1M+": None}
-RUBRIC_VERSION = int(os.environ.get("RUBRIC_VERSION", "1"))
-GOLD = Path(__file__).with_name("gold") / f"gold-v{RUBRIC_VERSION}.jsonl"
+_RV = os.environ.get("RUBRIC_VERSION", "1.2")
+RUBRIC_VERSION = float(_RV)
+GOLD = Path(__file__).with_name("gold") / f"gold-v{_RV}.jsonl"
+HELD_FAMILIES = ("fs.read", "data.read")          # the tier-0 read families a parent holds for its explorers (ruling 7)
 _DELEGATE_ALL_READING = re.compile(r"(use the researcher (sub-?agent )?for all reading|delegate (the|all) reading|only write the final file yourself|delegate .*reading|do not read)", re.I)
 
 
@@ -53,7 +57,8 @@ def label_row(r: dict, cat: dict) -> dict:
     asks_write = bool(re.search(r"\b(write|save)\b.*\.md\b|\b[A-Z_]+\.md\b", r.get("task") or ""))
     degenerate = (not root and not r["child_calls"]) or (root and asks_write and writes == 0)
     return {"event_id": r["event_id"], "project": r["project"], "framework": r["framework"], "agent": r["agent"], "role": "orchestrator" if root else "subagent",
-            "degenerate": degenerate,
+            "node": r.get("node"), "parent_node": r.get("parent_node"), "degenerate": degenerate,
+            "tools_available": r.get("tools_available"), "subagent_tools": r.get("subagent_tools"),      # declared suites when the harness recorded them (ADK/CrewAI)
             "task": r.get("task", ""), "observed_envelope": env, "delegated_to": r.get("delegated_to", []),
             "label": {"scopes": sorted(scopes), "ceilings": ceilings, "ttl_bucket_s": 900},
             "negatives": sorted(set(negatives)), "over_exploration": over,
@@ -62,6 +67,25 @@ def label_row(r: dict, cat: dict) -> dict:
                           else "orchestrator: the requested write + the delegation it was asked to make"),
             "reviewer": "session-2026-08-18 + gemini-via-rafael" if RUBRIC_VERSION >= 1 else "session-2026-08-18",
             "rubric_version": RUBRIC_VERSION}
+
+
+def apply_held_for_delegation(gold_rows: list[dict]) -> None:
+    """Ruling 7 (v1.2): within one run/task, every ancestor's label gains the HELD_FAMILIES its descendants' labels
+    contain, marked `held_for_delegation` (in place). A parent cannot delegate what it does not hold."""
+    by_run: dict[str, list[dict]] = {}
+    for g in gold_rows:
+        by_run.setdefault(str(g.get("run_key")), []).append(g)
+    for rows in by_run.values():
+        by_node = {g["node"]: g for g in rows if g.get("node")}
+        for g in rows:
+            need = set(); stack = [c for c in rows if c.get("parent_node") == g.get("node")]; seen = set()
+            while stack:                                          # all descendants
+                c = stack.pop()
+                if c["node"] in seen: continue
+                seen.add(c["node"]); need |= set(c["label"]["scopes"]) & set(HELD_FAMILIES)
+                stack += [x for x in rows if x.get("parent_node") == c.get("node")]
+            g["label"]["held_for_delegation"] = sorted(need)
+            g["label"]["scopes"] = sorted(set(g["label"]["scopes"]) | need)
 
 
 def _truncation_index() -> dict:
@@ -83,7 +107,10 @@ def main(argv=None) -> int:
             if line.strip():
                 r = json.loads(line); g = label_row(r, cat)
                 g["truncated"] = bool(trunc.get((run_id, r.get("run", {}).get("task_index")), False))
+                g["run_key"] = f"{run_id}:{r.get('run', {}).get('task_index')}"
                 gold.append(g)
+    if RUBRIC_VERSION >= 1.2:
+        apply_held_for_delegation(gold)
     GOLD.write_text("\n".join(json.dumps(g, sort_keys=True) for g in gold) + "\n")
     print("| # | project / fw | agent | task (truncated) | observed tools · quantities | label scopes | ceilings | over-exploration |")
     print("|---|---|---|---|---|---|---|---|")

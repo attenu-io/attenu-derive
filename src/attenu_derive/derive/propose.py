@@ -24,10 +24,29 @@ from attenu_derive.derive import templates
 __all__ = ["DelegationEvent", "DerivationRecord", "Deriver", "spec_to_authority"]
 
 # tools_available per framework, when the corpus row does not carry it (harness configs; recorded in manifests going forward)
-FRAMEWORK_TOOLS = {
+FRAMEWORK_TOOLS = {   # a list = every agent holds the same suite; a dict = per-agent suites ("*" = default for sub-agents)
     "langchain/deepagents": ["ls", "glob", "grep", "read_file", "write_file", "edit_file", "write_todos", "task"],
     "claude-agent-sdk": ["Read", "Grep", "Glob", "Write", "Agent", "SendMessage"],   # SendMessage is a built-in the CLI always exposes
+    "google-adk": {"orchestrator": ["write_file", "researcher", "security_reviewer", "test_analyst", "api_surveyor"],   # AgentTools carry the child's name
+                   "*": ["list_files", "read_file", "search_files"]},
+    "crewai": {"orchestrator": ["write_file", "delegate_work_to_coworker", "ask_question_to_coworker"],
+               "*": ["list_files", "read_file", "search_files"]},
 }
+
+
+def tools_for(framework: str, agent: str, fallback: list[str] | None = None) -> list[str]:
+    """The declared tool suite of `agent` under `framework` (per-agent dict or shared list), else `fallback`."""
+    suite = FRAMEWORK_TOOLS.get(framework)
+    if isinstance(suite, dict):
+        return list(suite.get(agent) or suite.get("*") or fallback or [])
+    return list(suite) if suite is not None else list(fallback or [])
+
+
+def subagent_tools_for(framework: str, declared: list[str], row_map: dict | None = None) -> dict[str, list[str]]:
+    """{sub-agent: its declared tools} for a parent's declared sub-agents (the delegation subtree the parent must cover)."""
+    if row_map:
+        return {k: list(v) for k, v in row_map.items()}
+    return {c: tools_for(framework, c) for c in (declared or [])}
 
 
 @dataclass
@@ -38,6 +57,7 @@ class DelegationEvent:
     tools_available: list[str]
     parent_authority: Authority | None       # None for a root with no parent (then no meet)
     declared_subagents: list[str] = field(default_factory=list)
+    subagent_tools: dict[str, list[str]] = field(default_factory=dict)   # declared sub-agents' tool suites: the delegation subtree a parent must cover (rubric v1.2)
 
 
 @dataclass
@@ -110,9 +130,11 @@ class Deriver:
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
         t0 = time.perf_counter()
-        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog)
+        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog, subagent_tools=ev.subagent_tools)
         if m is not None:
             spec = {"scopes": sorted(m.scopes), "ceilings": m.ceilings, "ttl": m.ttl}
+            if m.held_for_delegation:
+                spec["held_for_delegation"] = list(m.held_for_delegation)     # survives onto the ledger with the record (rubric v1.2)
             layer, tname, conf, evidence = "L1", m.name, m.confidence, m.evidence
         else:
             l2 = self._l2(ev)
@@ -130,12 +152,14 @@ class Deriver:
 
 
 def event_from_row(row: dict, task_text: str | None = None) -> DelegationEvent:
-    fw = row.get("framework", "")
-    tools = FRAMEWORK_TOOLS.get(fw, sorted({c["tool"] for c in row.get("child_calls", [])}))
+    fw = row.get("framework", ""); agent = row.get("agent", "")
+    tools = list(row["tools_available"]) if row.get("tools_available") else tools_for(fw, agent, sorted({c["tool"] for c in row.get("child_calls", [])}))
+    sub_tools = subagent_tools_for(fw, list(row.get("delegated_to") or []), row.get("subagent_tools"))
     parent = Authority({"fs.*", "data.*", "compute.pure", "device.actuate", "agent.delegate.*", "agent.message", "web.*", "code.exec"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)  # observe-mode root
     return DelegationEvent(task=task_text if task_text is not None else (row.get("task") or ""),
-                           role="root" if row.get("parent_node") is None else "child", agent=row.get("agent", ""),
-                           tools_available=tools, parent_authority=parent, declared_subagents=list(row.get("delegated_to") or ["researcher"]))
+                           role="root" if row.get("parent_node") is None else "child", agent=agent,
+                           tools_available=tools, parent_authority=parent, declared_subagents=list(row.get("delegated_to") or ["researcher"]),
+                           subagent_tools=sub_tools)
 
 
 def main(argv=None) -> int:

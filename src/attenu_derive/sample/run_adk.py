@@ -52,6 +52,7 @@ SPECIALISTS = {   # name -> (description, instruction); names are ADK identifier
     "api_surveyor":      ("Maps the public API / CLI surface and deprecations.",
                           "You map the public API or CLI surface: entry points, exported functions/commands, deprecated items; report with file paths. Do NOT write files."),
 }
+AGENT_TOOLS = {"orchestrator": ["write_file"] + list(SPECIALISTS), **{n: ["list_files", "read_file", "search_files"] for n in SPECIALISTS}}   # declared suites -> corpus rows
 FANOUT_TASKS = [
     "Produce REPORT.md for this repository with four sections: architecture, security-relevant paths, tests, public API. "
     "Delegate EACH section to its specialist sub-agent tool (researcher, security_reviewer, test_analyst, api_surveyor), "
@@ -288,6 +289,9 @@ def main(argv=None) -> int:
         rows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="hash")
         mrows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="keep")
         for r, mr in zip(rows, mrows):
+            r["tools_available"] = mr["tools_available"] = list(AGENT_TOOLS.get(r["agent"], []))            # declared suite (role-specific)
+            if r["parent_node"] is None:
+                r["subagent_tools"] = mr["subagent_tools"] = {n: list(AGENT_TOOLS[n]) for n in SPECIALISTS}   # the delegation subtree a parent must cover
             if r["parent_node"] is None:                # the root's task text is the prompt (the spawn records carry the children's)
                 r["task_hash"] = hashlib.sha256(f"{salt}\x1f{task}".encode()).hexdigest()[:16]
                 r["task_features"] = _task_features(task); mr["task"] = task

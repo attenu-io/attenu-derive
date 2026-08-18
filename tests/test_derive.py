@@ -31,7 +31,9 @@ def test_l1_orchestrator_template_grants_delegate_and_write_with_call_limit():
     assert rec.layer == "L1" and rec.template == "delegating-writer"
     assert auth.covers_scope("agent.delegate.researcher") and auth.covers_scope("fs.write")
     assert not auth.covers_scope("agent.delegate.exfiltrator")
-    assert not auth.covers_scope("fs.read")            # rubric v1: explicit "delegate the reading" -> no reads
+    # rubric v1 said "explicit 'delegate the reading' -> no reads"; rubric v1.2 (T13) reversed it: child ⊆ parent, so the
+    # orchestrator HOLDS fs.read for delegation (marked), and its OWN reads are the over-exploration signal, not a scope
+    assert auth.covers_scope("fs.read") and rec.spec.get("held_for_delegation") == ["fs.read"]
     cl = auth.ceiling("max_calls[fs.write]"); assert cl is not None and cl.max_calls == 5 and cl.applies_to == "fs.write"
     assert rec.spec["ceilings"][0].get("applies_to") == "fs.write" or any(c.get("applies_to") == "fs.write" for c in rec.spec["ceilings"])
 
@@ -168,3 +170,51 @@ def test_l1_never_grants_tier2_even_when_a_tool_resolves_there():
              tools_available=["read_file", "delete_message", "Bash"], parent_authority=WIDE)
     auth, rec = d.propose(ev)
     assert rec.template == "explorer" and auth.scopes == {"fs.read"}
+
+
+# ---- T13 fix (rubric ruling 2 reversed, 2026-08-18): a parent HOLDS what it delegates -------------------------
+def test_delegating_writer_holds_the_read_families_of_its_tools_for_delegation():
+    """Monotonic attenuation: child ⊆ parent, so an orchestrator that delegates exploration must HOLD the read
+    families its sub-agents need. Computed from its own tools_available under T12 semantics (never wider, tier<=1),
+    and MARKED as held_for_delegation on the record — the only trace of held-to-pass-down vs held-to-use."""
+    d = Deriver()
+    base = dict(task="Produce REPORT.md. Delegate all reading to the researcher subagent; write only the final file yourself.",
+                role="root", agent="orchestrator", declared_subagents=["researcher"], parent_authority=WIDE)
+    auth, rec = d.propose(_ev(**base, tools_available=["Read", "Grep", "Glob", "Write", "Agent", "SendMessage"]))
+    assert rec.template == "delegating-writer"
+    assert auth.covers_scope("fs.read") and auth.covers_scope("fs.write") and auth.covers_scope("agent.delegate.researcher")
+    assert rec.spec.get("held_for_delegation") == ["fs.read"]                     # marked on the record / ledger
+    assert "fs.read" in rec.evidence.get("held_for_delegation", [])
+    # the child's meet now works: an explorer derived against THIS authority keeps its reads
+    child, crec = d.propose(_ev(task="Explore the repository and report findings", role="child", agent="researcher",
+                                tools_available=["Read", "Grep", "Glob"], parent_authority=auth))
+    assert child.covers_scope("fs.read") and child.permits("fs.read", {"rows": 10})
+    # never wider: no read tools -> nothing held; a data.read tool -> data.read held, not fs.read
+    a2, r2 = d.propose(_ev(**base, tools_available=["task", "write_file"]))
+    assert not a2.covers_scope("fs.read") and r2.spec.get("held_for_delegation", []) == []
+    a3, r3 = d.propose(_ev(**base, tools_available=["task", "write_file", "get_stock_info"]))
+    assert a3.covers_scope("data.read") and not a3.covers_scope("fs.read") and r3.spec.get("held_for_delegation") == ["data.read"]
+
+
+def test_held_for_delegation_comes_from_the_declared_subtree_not_only_own_tools():
+    """Role-specific suites (ADK, CrewAI): the orchestrator holds only write_file + AgentTools, its explorers hold the
+    read tools. 'Minimal closure over the delegation subtree' means the parent holds the read families its DECLARED
+    sub-agents' tools resolve to — still never wider than the subtree's tools, never tier 2."""
+    d = Deriver()
+    ev = _ev(task="Produce REPORT.md; delegate each section to the specialist sub-agent tools; write REPORT.md yourself with write_file.",
+             role="root", agent="orchestrator", tools_available=["write_file", "researcher", "security_reviewer"],
+             declared_subagents=["researcher", "security_reviewer"],
+             subagent_tools={"researcher": ["list_files", "read_file", "search_files"], "security_reviewer": ["list_files", "read_file", "search_files"]},
+             parent_authority=WIDE)
+    auth, rec = d.propose(ev)
+    assert rec.template == "delegating-writer"
+    assert auth.covers_scope("fs.read") and rec.spec.get("held_for_delegation") == ["fs.read"]
+    assert not auth.covers_scope("data.read") and not auth.covers_scope("code.exec")
+    child, _ = d.propose(_ev(task="Explore the repository and report findings", role="child", agent="researcher",
+                             tools_available=["list_files", "read_file", "search_files"], parent_authority=auth))
+    assert child.permits("fs.read", {"rows": 10})
+    # a sub-agent whose tools include a tier-2 tool: never held at L1
+    ev2 = _ev(task="Produce REPORT.md; delegate to the ops sub-agent; write REPORT.md yourself with write_file.", role="root", agent="orchestrator",
+              tools_available=["write_file"], declared_subagents=["ops"], subagent_tools={"ops": ["read_file", "Bash", "delete_message"]}, parent_authority=WIDE)
+    a2, r2 = d.propose(ev2)
+    assert a2.covers_scope("fs.read") and not a2.covers_scope("code.exec") and not a2.covers_scope("data.delete")

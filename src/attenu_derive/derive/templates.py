@@ -70,12 +70,18 @@ class TemplateMatch:
     ttl: int
     confidence: float
     evidence: dict = field(default_factory=dict)
+    held_for_delegation: list[str] = field(default_factory=list)   # scopes the node holds to PASS DOWN, not to use itself (rubric v1.2)
 
 
-def match(role: str, task: str, tools_available: list[str], declared_subagents: list[str], catalog: dict | None = None) -> TemplateMatch | None:
+def match(role: str, task: str, tools_available: list[str], declared_subagents: list[str], catalog: dict | None = None,
+          subagent_tools: dict[str, list[str]] | None = None) -> TemplateMatch | None:
     """Return the best-matching L1 template, or None (fall through to L2)."""
     task = task or ""
     fams = families_of(tools_available, catalog)
+    # the delegation SUBTREE's tools: what the declared sub-agents hold (role-specific suites: ADK/CrewAI orchestrators
+    # hold no read tool themselves, their explorers do). A parent must hold what it delegates — from the subtree, never wider.
+    sub_fams = families_of(sorted({t for ts in (subagent_tools or {}).values() for t in ts}), catalog)
+    subtree_read_scopes, subtree_read_heur = _scopes_in({**sub_fams, **fams}, EXPLORER_FAMILIES)
     read_scopes, read_heur = _scopes_in(fams, EXPLORER_FAMILIES)
     write_scopes, write_heur = _scopes_in(fams, WRITER_FAMILIES)
     has_read = "fs.read" in read_scopes; has_write = bool(write_scopes)     # the verb-less explorer path is anchored to REPOSITORY reads (fs.read), not any data API
@@ -95,13 +101,21 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
     # DELEGATING-WRITER: a root that delegates exploration and writes one deliverable.
     if role == "root" and (_WRITE_OUT.search(task) or has_write) and (has_del or _DELEGATE.search(task) or declared_subagents):
         scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in (declared_subagents or [])}   # the write family ITS tool resolves to — none without a write tool
+        # Rubric v1.2 (T13, 2026-08-18): monotonic attenuation means child ⊆ parent — a parent cannot delegate what
+        # it does not hold. The delegating-writer therefore HOLDS, for delegation, the read families its tools
+        # resolve to (T12 semantics: never wider, tier<=1). Its OWN reads remain the over-exploration signal (R3),
+        # not a scope question. Minimal authority for a parent = the minimal closure over its delegation subtree.
+        held = sorted(subtree_read_scopes - scopes)          # own read tools ∪ declared sub-agents' read tools, tier<=1 only
+        scopes |= set(held)
         if has_msg:                                     # messaging is structural to orchestration — but only if the tool exists
             scopes.add("agent.message")
         # Rubric v1: the delegating-writer role is delegate + write. Reads belong to the sub-agents it
         # delegates to; granting fs.read here was pure over-provision on every sampled project.
         reads_forbidden = bool(_DELEGATE_ALL_READING.search(task))
         ceilings = [{"type": "CallLimit", "max": 5, "applies_to": sc} for sc in sorted(write_scopes)] + [{"type": "EgressRank", "level": "none"}]
-        return TemplateMatch("delegating-writer", scopes, ceilings, 3600, 0.85 - (0.2 if write_heur else 0.0),
+        return TemplateMatch("delegating-writer", scopes, ceilings, 3600, 0.85 - (0.2 if (write_heur or subtree_read_heur) else 0.0),
                              {"signals": ["root-role", "write-deliverable", "delegates"] + (["delegate-all-reading"] if reads_forbidden else []),
-                              "write_tools": sorted(t for t, e in fams.items() if e.get("scope") in WRITER_FAMILIES), "heuristic_tools": write_heur})
+                              "write_tools": sorted(t for t, e in fams.items() if e.get("scope") in WRITER_FAMILIES), "heuristic_tools": sorted(set(write_heur + subtree_read_heur)),
+                              "held_for_delegation": held},
+                             held_for_delegation=held)
     return None
