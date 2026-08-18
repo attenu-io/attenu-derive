@@ -17,6 +17,8 @@ scopes:
   - db.write
   - payments.transfer
   - agent.delegate.*
+  - agent.message
+  - state.write        # internal scratch state (todos), not a resource
 ceilings:            # existing delegation-guard types only
   - RowLimit
   - SpendCap
