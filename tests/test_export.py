@@ -56,3 +56,9 @@ def test_export_never_carries_raw_values_or_prompts():
     rows = audit_to_corpus_rows(AUDIT, run=RUN)
     blob = json.dumps(rows)
     assert "attacker" not in blob and "/secrets" not in blob
+
+
+def test_envelope_handles_negative_quantities():
+    row = {"child_calls": [{"tool": "t", "outcome": "allow", "quantities": {"x": "neg"}},
+                           {"tool": "t", "outcome": "allow", "quantities": {"x": "2-10"}}]}
+    assert observed_envelope(row)["quantities_max"] == {"x": "2-10"}

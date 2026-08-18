@@ -18,7 +18,7 @@ from attenu_derive.sample.features import length_bucket
 
 __all__ = ["audit_to_corpus_rows", "observed_envelope"]
 
-_QORDER = ["0", "1", "2-10", "11-100", "101-1k", "1k-10k", "10k-100k", "100k-1M", "1M+"]
+_QORDER = ["neg", "0", "1", "2-10", "11-100", "101-1k", "1k-10k", "10k-100k", "100k-1M", "1M+"]   # "neg" = negative quantity (lowest)
 
 
 def _qmax(a: str | None, b: str) -> str:
