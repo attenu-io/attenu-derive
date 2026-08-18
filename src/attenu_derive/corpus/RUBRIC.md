@@ -1,4 +1,18 @@
-# Labeling rubric v0 — "minimal sufficient authority" for a delegation event
+# Labeling rubric v1 — "minimal sufficient authority" for a delegation event
+
+*v1 (2026-08-18) supersedes v0 after the two-reviewer adjudication of the first 26 items (see `gold/adjudication.md`). v0 text kept below the v1 rulings for history.*
+
+## v1 rulings (binding)
+1. **Explicit prompt contradiction is over-reach, not over-exploration.** If the task text explicitly restricts an action ("use the researcher for all reading", "delegate the reading", "do NOT write files", "only write the final file yourself"), calls that contradict it are **negatives**: not admitted by the label. Absent an explicit restriction, benign extra calls stay admitted (v0 default).
+2. **Agent-to-agent messaging is structural to orchestration:** `agent.message` (e.g. `SendMessage`) is admitted for orchestrator roles.
+3. **Write loops are a liability, not just a cost:** orchestrator labels carry a **`CallLimit(5)` on `fs.write`** (a report task needs a handful of writes). Engineering note: the shim's `CallLimit` is not scope-specific today — adapters must meter only write calls into the `calls` context (or the vocabulary gains scoped quantity ceilings); tracked in the plan.
+4. **Role defaults over observed minima for read ceilings:** sub-agent researchers get `RowLimit(1000)` regardless of the run's observed maximum (over-fitting to the lowest observed bucket would raise the benign-deny rate as tasks vary); `EgressRank(none)` stays.
+5. **Rubric stance:** flag-but-admit is too loose for a defensible posture; prompt contradictions and framework failure modes become constraints. "Needed vs over-exploration" remains the mental model.
+
+---
+
+## v0 (historical)
+
 
 *Panel condition (design §5a): the mechanical observed envelope is an EMPIRICAL ENVELOPE of one run,
 not a label; it becomes a label only after review under this rubric, with adjudication recorded.*
