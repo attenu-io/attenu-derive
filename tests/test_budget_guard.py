@@ -103,3 +103,25 @@ def test_budget_between_parent_only_and_total_aborts_because_of_the_subagent():
 def test_estimate_cost_uses_public_prices():
     assert estimate_cost("claude-haiku-4-5-20251001", 1_000_000, 0) == 1.0
     assert estimate_cost("claude-haiku-4-5-20251001", 0, 1_000_000) == 5.0
+
+
+# ---- G3 volume run (Rafael's go, 2026-08-18): honest cost + a hard USD ceiling per batch ------------------
+def test_estimate_cost_is_cache_aware():
+    from attenu_derive.sample.run_deepagents import estimate_cost, usage_from_callback
+    # Haiku 4.5 list: input 1.00 / output 5.00 / cache read 0.10 / cache write 1.25 (USD per 1M)
+    assert estimate_cost("claude-haiku-4-5-20251001", 1_000_000, 0) == pytest.approx(1.0)                       # no cache info: all input at list
+    assert estimate_cost("claude-haiku-4-5-20251001", 1_000_000, 0, cache_read=900_000) == pytest.approx(0.1 + 0.09)   # 100k fresh + 900k cached
+    assert estimate_cost("claude-haiku-4-5-20251001", 1_000_000, 200_000, cache_read=500_000, cache_creation=100_000) == \
+        pytest.approx(0.4 * 1.0 + 0.5 * 0.10 + 0.1 * 1.25 + 0.2 * 5.0)
+    u = usage_from_callback({"claude-haiku-4-5-20251001": {"input_tokens": 1000, "output_tokens": 10, "total_tokens": 1010,
+                                                           "input_token_details": {"cache_read": 700, "cache_creation": 100}}}, "claude-haiku-4-5-20251001")
+    assert u["input_tokens"] == 1000 and u["cache_read_tokens"] == 700 and u["cache_creation_tokens"] == 100
+    assert u["est_cost_usd"] == pytest.approx(round(200 / 1e6 * 1.0 + 700 / 1e6 * 0.10 + 100 / 1e6 * 1.25 + 10 / 1e6 * 5.0, 6), abs=1e-6)
+    assert u["est_cost_usd_list"] == pytest.approx(round(1000 / 1e6 * 1.0 + 10 / 1e6 * 5.0, 6), abs=1e-6)          # what we used to report (upper bound)
+
+
+def test_batch_usd_ceiling_stops_the_batch():
+    from attenu_derive.sample.run_deepagents import batch_should_stop
+    assert batch_should_stop(spent_usd=0.49, max_usd=0.50, next_task_worst_case_usd=0.30) is True    # would breach on the next task
+    assert batch_should_stop(spent_usd=0.10, max_usd=0.50, next_task_worst_case_usd=0.30) is False
+    assert batch_should_stop(spent_usd=0.10, max_usd=None, next_task_worst_case_usd=0.30) is False   # no ceiling set

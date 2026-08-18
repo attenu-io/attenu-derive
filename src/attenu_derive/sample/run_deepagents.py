@@ -47,22 +47,24 @@ DEFAULT_TASKS = [
     "directory. Delegate reading to the researcher; write TESTING.md.",
 ]
 
+_FRUGAL = (" Be frugal: at most ~12 tool calls; prefer grep/glob over reading whole files; read only the parts you need; "
+           "stop and answer as soon as you can.")
 RESEARCHER = {
     "name": "researcher",
     "description": "Explores the repository: lists, greps and reads files, and reports back concise findings with file paths.",
     "system_prompt": ("You are a code researcher. Use ls, glob, grep and read_file to explore the repository "
                       "efficiently (few, targeted reads). Return concise findings with file paths and line "
-                      "references. Do NOT write files."),
+                      "references. Do NOT write files." + _FRUGAL),
 }
 # T14 (2026-08-18): fan-out specialists — one task -> 3-5 delegations, so the paid path's USD/event drops ~4x.
 SPECIALISTS = [
     RESEARCHER,
     {"name": "security-reviewer", "description": "Finds security-relevant code paths (input parsing, file/network access, auth, escaping, secrets).",
-     "system_prompt": "You are a security reviewer. Use ls, glob, grep and read_file (few, targeted reads) to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files."},
+     "system_prompt": "You are a security reviewer. Use ls, glob, grep and read_file (few, targeted reads) to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files." + _FRUGAL},
     {"name": "test-analyst", "description": "Explains how tests are organized and run.",
-     "system_prompt": "You analyse the test suite: locate tests, runners, CI config with ls/glob/grep/read_file (few, targeted reads); report how to run them, with file paths. Do NOT write files."},
+     "system_prompt": "You analyse the test suite: locate tests, runners, CI config with ls/glob/grep/read_file (few, targeted reads); report how to run them, with file paths. Do NOT write files." + _FRUGAL},
     {"name": "api-surveyor", "description": "Maps the public API / CLI surface and deprecations.",
-     "system_prompt": "You map the public API or CLI surface: entry points, exported functions/commands, deprecated items; use ls/glob/grep/read_file (few, targeted reads); report with file paths. Do NOT write files."},
+     "system_prompt": "You map the public API or CLI surface: entry points, exported functions/commands, deprecated items; use ls/glob/grep/read_file (few, targeted reads); report with file paths. Do NOT write files." + _FRUGAL},
 ]
 FANOUT_TASKS = [
     "Produce REPORT.md for this repository with four sections: architecture, security-relevant paths, tests, public API. "
@@ -74,6 +76,25 @@ FANOUT_TASKS = [
     "Assess this repository for a security review: delegate exploration to the researcher and the security-reviewer, ask the "
     "test-analyst whether security-relevant paths are covered by tests, and the api-surveyor which public APIs expose those paths. "
     "Write SECURITY_ASSESSMENT.md yourself; do all reading through the sub-agents.",
+]
+
+# G3 volume task set (2026-08-18): ten deliverables, each fanning out to >= 2 specialists, so a repo yields
+# ~10 tasks x 3-4 delegations with VARIED task text (the deriver's input) instead of the same three prompts.
+VOLUME_TASKS = FANOUT_TASKS + [
+    "Write TESTING_STRATEGY.md: the test-analyst maps the suite and how to run it, the api-surveyor lists the public entry points that "
+    "must stay covered, the security-reviewer names the risky paths that need tests. Delegate all reading to them via the task tool; write the file yourself.",
+    "Write API_GUIDE.md for users of this project: the api-surveyor maps the public API/CLI and deprecations, the researcher explains "
+    "the main modules behind it. Delegate all reading via the task tool; write only the final file yourself.",
+    "Write DEPENDENCIES.md: the researcher lists the project's dependencies and build/packaging manifests, the security-reviewer flags "
+    "risky or network-facing ones, the test-analyst notes test-only dependencies. Delegate every reading task; write the file yourself.",
+    "Write ERROR_HANDLING.md: the researcher maps how errors/exceptions flow through the code, the security-reviewer notes where "
+    "failures could leak data or bypass checks. Delegate all reading via the task tool; write only the final file yourself.",
+    "Write CONFIG.md: the researcher documents configuration, environment variables and defaults, the security-reviewer flags secrets "
+    "handling and unsafe defaults. Delegate all reading via the task tool; write the file yourself.",
+    "Write CONTRIBUTING_NOTES.md for a new maintainer: the researcher explains the layout and build, the test-analyst how to run and "
+    "add tests, the api-surveyor what public surface changes need care. Delegate all reading; write the file yourself.",
+    "Write RELEASE_CHECKLIST.md: the api-surveyor lists public-surface items to verify, the test-analyst the test/CI gates, the "
+    "security-reviewer the security checks before a release. Delegate all reading via the task tool; write only the final file yourself.",
 ]
 
 
@@ -109,14 +130,36 @@ def make_guarded(salt: str) -> tuple[Guard, GuardedDelegation]:
     return root, guarded
 
 
-# Public list prices (USD per 1M tokens) for the models we sample with — for HONEST run manifests
-# and budget guardrails; update when prices change. Unknown model -> conservative Sonnet-class.
-_PRICES = {"claude-haiku-4-5": (1.0, 5.0), "claude-sonnet-4-5": (3.0, 15.0), "claude-sonnet-4": (3.0, 15.0), "claude-opus": (15.0, 75.0)}
+# Public list prices (USD per 1M tokens: input, output, cache read, cache write) for the models we sample with — for
+# HONEST run manifests and budget guardrails; update when prices change. Unknown model -> conservative Sonnet-class.
+# Cache-aware since the G3 volume run (2026-08-18): the earlier figures priced EVERY input token at list, i.e. an
+# upper bound; `est_cost_usd_list` keeps that bound, `est_cost_usd` is the cache-aware estimate.
+_PRICES = {"claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25), "claude-sonnet-4-5": (3.0, 15.0, 0.30, 3.75), "claude-sonnet-4": (3.0, 15.0, 0.30, 3.75), "claude-opus": (15.0, 75.0, 1.50, 18.75)}
 
 
-def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    pin, pout = next((v for k, v in _PRICES.items() if model.startswith(k)), (3.0, 15.0))
-    return input_tokens / 1e6 * pin + output_tokens / 1e6 * pout
+def estimate_cost(model: str, input_tokens: int, output_tokens: int, cache_read: int = 0, cache_creation: int = 0) -> float:
+    """`input_tokens` is the total input (LangChain/Anthropic: cached reads and cache writes included); the cached parts
+    are re-priced at their own rates."""
+    pin, pout, pread, pwrite = next((v for k, v in _PRICES.items() if model.startswith(k)), (3.0, 15.0, 0.30, 3.75))
+    fresh = max(0, input_tokens - cache_read - cache_creation)
+    return fresh / 1e6 * pin + cache_read / 1e6 * pread + cache_creation / 1e6 * pwrite + output_tokens / 1e6 * pout
+
+
+def usage_from_callback(usage_metadata: dict, model: str) -> dict:
+    """Aggregate LangChain's per-model usage (incl. input_token_details) into the manifest's usage dict."""
+    u = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0}
+    for m in (usage_metadata or {}).values():
+        u["input_tokens"] += int(m.get("input_tokens", 0) or 0); u["output_tokens"] += int(m.get("output_tokens", 0) or 0)
+        d = m.get("input_token_details") or {}
+        u["cache_read_tokens"] += int(d.get("cache_read", 0) or 0); u["cache_creation_tokens"] += int(d.get("cache_creation", 0) or 0)
+    u["est_cost_usd"] = round(estimate_cost(model, u["input_tokens"], u["output_tokens"], u["cache_read_tokens"], u["cache_creation_tokens"]), 6)
+    u["est_cost_usd_list"] = round(estimate_cost(model, u["input_tokens"], u["output_tokens"]), 6)
+    return u
+
+
+def batch_should_stop(*, spent_usd: float, max_usd: float | None, next_task_worst_case_usd: float) -> bool:
+    """Hard USD ceiling for a batch: stop BEFORE a task that could breach it (worst case = the per-task token cap at list price)."""
+    return max_usd is not None and spent_usd + next_task_worst_case_usd > max_usd
 
 
 class BudgetExceeded(RuntimeError):
@@ -165,11 +208,13 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="claude-haiku-4-5-20251001")
     ap.add_argument("--tasks", default=None, help="file with one task per line (default: built-in 5, or the fan-out 3 with --fanout)")
     ap.add_argument("--fanout", action="store_true", help="fan-out workload: 4 specialist sub-agents, one task -> 3-5 delegations (T14)")
+    ap.add_argument("--volume", action="store_true", help="G3 volume task set (10 fan-out deliverables); implies --fanout")
     ap.add_argument("--limit", type=int, default=None, help="only run the first N tasks")
     ap.add_argument("--recursion-limit", type=int, default=40)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--max-input-tokens", type=int, default=300_000,
                     help="HARD per-task budget: abort the run once cumulative input tokens exceed this (cost guardrail)")
+    ap.add_argument("--max-usd", type=float, default=None, help="HARD USD ceiling for the whole batch (cache-aware estimate): stop before a task that could breach it")
     args = ap.parse_args(argv)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -183,7 +228,8 @@ def main(argv=None) -> int:
 
     repo = Path(args.repo).resolve()
     project = args.project or repo.name
-    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (FANOUT_TASKS if args.fanout else DEFAULT_TASKS)
+    if args.volume: args.fanout = True
+    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (VOLUME_TASKS if args.volume else FANOUT_TASKS if args.fanout else DEFAULT_TASKS)
     if args.limit:
         tasks = tasks[: args.limit]
 
@@ -195,8 +241,12 @@ def main(argv=None) -> int:
                 "salt": salt, "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION,
                                             "python": platform.python_version()}}
 
-    corpus_rows, mirror_rows, per_task = [], [], []
+    corpus_rows, mirror_rows, per_task = [], [], []; stopped_by = None
+    worst_case = estimate_cost(args.model, args.max_input_tokens, 8_000)          # a task can spend at most its token cap (at list) + some output
     for i, task in enumerate(tasks):
+        spent = sum(p["usage"].get("est_cost_usd", 0) for p in per_task)
+        if batch_should_stop(spent_usd=spent, max_usd=args.max_usd, next_task_worst_case_usd=worst_case):
+            stopped_by = f"max_usd: spent {spent:.3f} + worst case {worst_case:.3f} > {args.max_usd}"; print(f"[batch] stop: {stopped_by}"); break
         root, guarded = make_guarded(salt)
         agent = build_agent(model=model, repo=repo, guarded=guarded, fanout=args.fanout)
         t0 = time.time(); status = "ok"
@@ -210,11 +260,7 @@ def main(argv=None) -> int:
                          config={"recursion_limit": args.recursion_limit, "callbacks": [cb, guard_cb]})
         except Exception as exc:  # keep sampling; record the failure (incl. BudgetExceeded)
             status = f"error: {type(exc).__name__}: {str(exc)[:120]}"
-        usage = {"input_tokens": 0, "output_tokens": 0}
-        for m in (cb.usage_metadata or {}).values():
-            usage["input_tokens"] += int(m.get("input_tokens", 0) or 0)
-            usage["output_tokens"] += int(m.get("output_tokens", 0) or 0)
-        usage["est_cost_usd"] = round(estimate_cost(args.model, usage["input_tokens"], usage["output_tokens"]), 4)
+        usage = usage_from_callback(cb.usage_metadata or {}, args.model)
         entries = root.audit_log().entries
         (out / "runs" / run_id / f"task{i}-audit.jsonl").write_text(
             "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
@@ -244,15 +290,18 @@ def main(argv=None) -> int:
     (out / "mirror" / f"{project}-deepagents-{run_id}.jsonl").write_text(
         "\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
     manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"},
-                "billing": "api", "workload": "fanout" if args.fanout else "single-researcher",
-                "guardrails": {"max_input_tokens": args.max_input_tokens, "recursion_limit": args.recursion_limit, "prompt_caching": True},
+                "billing": "api", "workload": "volume" if args.volume else "fanout" if args.fanout else "single-researcher",
+                "guardrails": {"max_input_tokens": args.max_input_tokens, "recursion_limit": args.recursion_limit, "prompt_caching": True, "max_usd": args.max_usd},
+                "stopped_by": stopped_by, "tasks_run": len(per_task),
                 "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"] is not None),
                            "rows": len(corpus_rows),
                            "tool_calls": sum(len(r["child_calls"]) for r in corpus_rows),
                            "input_tokens": sum(p["usage"].get("input_tokens", 0) for p in per_task),
                            "output_tokens": sum(p["usage"].get("output_tokens", 0) for p in per_task),
-                           "est_cost_usd": round(sum(p["usage"].get("est_cost_usd", 0) for p in per_task), 4)}}
+                           "cache_read_tokens": sum(p["usage"].get("cache_read_tokens", 0) for p in per_task),
+                           "est_cost_usd": round(sum(p["usage"].get("est_cost_usd", 0) for p in per_task), 4),
+                           "est_cost_usd_list": round(sum(p["usage"].get("est_cost_usd_list", 0) for p in per_task), 4)}}
     (out / "runs" / run_id / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(json.dumps(manifest["totals"]))
     return 0
