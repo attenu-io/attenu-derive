@@ -218,3 +218,15 @@ def test_held_for_delegation_comes_from_the_declared_subtree_not_only_own_tools(
               tools_available=["write_file"], declared_subagents=["ops"], subagent_tools={"ops": ["read_file", "Bash", "delete_message"]}, parent_authority=WIDE)
     a2, r2 = d.propose(ev2)
     assert a2.covers_scope("fs.read") and not a2.covers_scope("code.exec") and not a2.covers_scope("data.delete")
+
+
+def test_explorer_guard_matches_money_verbs_not_ordinary_english():
+    """Regression (found in review): 'in order to' tripped the explorer's non-local guard -> L2 -> fs.write granted to an
+    explorer. The guard must match money/booking VERB phrases, not the words 'order'/'book' in ordinary English."""
+    d = Deriver()
+    a, r = d.propose(_ev(task="Explore the repository in order to report how requests are routed; book of records is docs/", role="child",
+                         agent="researcher", tools_available=["Read", "Grep", "Glob", "Write", "Agent"], parent_authority=WIDE))
+    assert r.template == "explorer" and a.scopes == {"fs.read"}
+    a2, r2 = d.propose(_ev(task="Check the weather and book a flight for me", role="child", agent="bot",
+                           tools_available=["get_weather_forecast", "book_flight"], parent_authority=WIDE))
+    assert r2.template is None                                                       # money verb phrase -> falls to L2 as intended

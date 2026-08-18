@@ -27,7 +27,7 @@ _DELEGATE_ALL_READING = re.compile(r"(use the researcher (sub-?agent )?for all r
 _NO_WRITE = re.compile(r"\b(do not write|don't write|no writes?|read[- ]only)\b", re.I)
 # Anything that implies a resource family beyond the local filesystem: the explorer template must NOT
 # match (it would deny the needed web/mail/payment call) — fall through to L2 (catalog) instead.
-_NON_LOCAL = re.compile(r"\b(fetch|download|website|web ?site|url|https?://|api call|e-?mail|mail|send|pay|payment|transfer|deploy|push|upload|post to|book|order|purchase|buy|reserve)\b", re.I)
+_NON_LOCAL = re.compile(r"\b(fetch|download|website|web ?site|url|https?://|api call|e-?mail|mail|send|pay|payment|transfer|deploy|push|upload|post to|purchase|buy|reserve|book (a|an|the|me|us)|place (an|the|a) order|order (a|an|the|from|online))\b", re.I)   # money/booking VERB phrases only — not "in order to" / "book of"
 
 EXPLORER_FAMILIES = frozenset({"fs.read", "data.read"})              # tier-0 read families an explorer may hold
 WRITER_FAMILIES = frozenset({"fs.write", "data.write"})              # tier-1 write families a delegating-writer may hold
