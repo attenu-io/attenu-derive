@@ -28,6 +28,7 @@ tools:
   Agent:       {scope: agent.delegate, consumes: {subagent_type: delegate_target}, tier: 1}
   Task:        {scope: agent.delegate, consumes: {subagent_type: delegate_target}, tier: 1}
   SendMessage: {scope: agent.message, consumes: {}, tier: 1}
+  ListAgents:  {scope: agent.message, consumes: {}, tier: 1}    # teammate discovery — messaging family (curated from cobra sampling)
   TodoWrite:   {scope: state.write, consumes: {}, tier: 0}
   # --- framework demo tools (delegation-guard examples) -----------------------------------
   crm_query:   {scope: crm.read,   consumes: {rows: max_rows}, tier: 1}
