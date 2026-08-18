@@ -78,6 +78,19 @@ def default_timeout_s(*, fanout: bool, explicit: float | None = None) -> float:
     return FANOUT_TIMEOUT_S if fanout else PLAIN_TIMEOUT_S
 
 
+def foreground_delegation(input_data: dict) -> dict:
+    """PreToolUse rewrite: a delegation launched with `run_in_background: true` is forced to the foreground.
+    `AgentDefinition(background=False)` is only a default the model can override per call; background
+    subagents make the parent's turn end early and the run's wall clock unbounded (T8 root cause)."""
+    if input_data.get("tool_name") in ("Agent", "Task"):
+        ti = input_data.get("tool_input") or {}
+        if ti.get("run_in_background"):
+            return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
+                                           "permissionDecisionReason": "attenu-sample: subagents run in the foreground",
+                                           "updatedInput": {**ti, "run_in_background": False}}}
+    return {}
+
+
 def make_registry(salt: str):
     root = Guard.issue("orchestrator", OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     reg = DelegationGuardRegistry(
@@ -98,8 +111,9 @@ async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: i
     async def capture_delegation(input_data, tool_use_id, context):
         if input_data.get("tool_name") in ("Agent", "Task"):
             ti = input_data.get("tool_input") or {}
-            delegations.append({"agent_type": ti.get("subagent_type"), "task": ti.get("prompt") or ti.get("description") or ""})
-        return {}
+            delegations.append({"agent_type": ti.get("subagent_type"), "task": ti.get("prompt") or ti.get("description") or "",
+                                "background_requested": bool(ti.get("run_in_background"))})
+        return foreground_delegation(input_data)
 
     hooks = reg.hooks()
     hooks["PreToolUse"] = [HookMatcher(hooks=[capture_delegation])] + hooks["PreToolUse"]
@@ -216,7 +230,8 @@ def main(argv=None) -> int:
         n_calls = sum(len(r["child_calls"]) for r in rows); n_deleg = sum(1 for r in rows if r["parent_node"])
         per_task.append({"task_index": i, "status": status, "seconds": round(time.time() - t0, 1),
                          "delegations": n_deleg, "tool_calls": n_calls, "usage": usage, "cost_usd": cost,
-                         "audit_events": len(entries), "denials": len(reg.denials)})
+                         "audit_events": len(entries), "denials": len(reg.denials),
+                         "background_requested": sum(1 for d in delegations if d.get("background_requested"))})   # how often the model asked for background subagents (rewritten to foreground)
         print(f"[task {i}] {status} | delegations={n_deleg} tool_calls={n_calls} denials={len(reg.denials)} "
               f"cost={cost} in {per_task[-1]['seconds']}s")
 
