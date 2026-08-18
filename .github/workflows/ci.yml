@@ -7,7 +7,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
-      - name: Install (delegation-guard is a PRIVATE sibling repo — installed via DG_READ_TOKEN when set; P0 follow-up: add that secret)
+      # delegation-guard is a PRIVATE sibling repo — installed via the DG_READ_TOKEN secret when set (P0 follow-up).
+      - name: Install
         env: { DG_READ_TOKEN: "${{ secrets.DG_READ_TOKEN }}" }
         run: |
           python -m pip install -q --upgrade pip
