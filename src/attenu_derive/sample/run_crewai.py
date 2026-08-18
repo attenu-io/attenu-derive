@@ -278,6 +278,8 @@ def main(argv=None) -> int:
             r["tools_available"] = mr["tools_available"] = list(AGENT_TOOLS.get(r["agent"], []))            # declared suite (role-specific)
             if r["parent_node"] is not None:
                 r["role_constraints"] = mr["role_constraints"] = {"no_write": True}                          # coworkers: "You never write files"
+            else:
+                r["declared_subagents"] = mr["declared_subagents"] = list(SPECIALISTS)                       # T21: declared roster
             if r["parent_node"] is None:
                 r["subagent_tools"] = mr["subagent_tools"] = {n: list(AGENT_TOOLS[n]) for n in SPECIALISTS}   # the delegation subtree a parent must cover
             if r["parent_node"] is None:

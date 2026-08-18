@@ -194,6 +194,9 @@ def main(argv=None) -> int:
             r["tools_available"] = mr["tools_available"] = list(tools_by_agent.get(r["agent"], []))          # DECLARED suite from the real tree
             if r["agent"] in subs_by_agent:
                 r["subagent_tools"] = mr["subagent_tools"] = {k: list(v) for k, v in subs_by_agent[r["agent"]].items()}
+                r["declared_subagents"] = mr["declared_subagents"] = sorted(subs_by_agent[r["agent"]])        # T21: declared roster from the real tree
+            elif r["parent_node"] is None:
+                r["declared_subagents"] = mr["declared_subagents"] = []
             if r["parent_node"] is None:
                 r["task_hash"] = hashlib.sha256(f"{salt}\x1f{prompt}".encode()).hexdigest()[:16]; r["task_features"] = _task_features(prompt); mr["task"] = prompt
         corpus_rows += rows; mirror_rows += mrows

@@ -100,7 +100,12 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
 
     # DELEGATING-WRITER: a root that delegates exploration and writes one deliverable.
     if role == "root" and (_WRITE_OUT.search(task) or has_write) and (has_del or _DELEGATE.search(task) or declared_subagents):
-        scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in (declared_subagents or [])}   # the write family ITS tool resolves to — none without a write tool
+        # Which sub-agents? Derived from the TASK: if the text names members of the declared roster, only those; if it names
+        # none, the whole roster (the deriver cannot know). Names match with '-'/'_'/' ' treated alike (T21 follow-up).
+        low = re.sub(r"[-_]", " ", task.lower())
+        named = [s for s in (declared_subagents or []) if re.search(r"\b" + re.escape(re.sub(r"[-_]", " ", s.lower())) + r"\b", low)]
+        wanted = named or list(declared_subagents or [])
+        scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in wanted}   # the write family ITS tool resolves to — none without a write tool
         # Rubric v1.2 (T13, 2026-08-18): monotonic attenuation means child ⊆ parent — a parent cannot delegate what
         # it does not hold. The delegating-writer therefore HOLDS, for delegation, the read families its tools
         # resolve to (T12 semantics: never wider, tier<=1). Its OWN reads remain the over-exploration signal (R3),
@@ -116,6 +121,6 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
         return TemplateMatch("delegating-writer", scopes, ceilings, 3600, 0.85 - (0.2 if (write_heur or subtree_read_heur) else 0.0),
                              {"signals": ["root-role", "write-deliverable", "delegates"] + (["delegate-all-reading"] if reads_forbidden else []),
                               "write_tools": sorted(t for t, e in fams.items() if e.get("scope") in WRITER_FAMILIES), "heuristic_tools": sorted(set(write_heur + subtree_read_heur)),
-                              "held_for_delegation": held},
+                              "held_for_delegation": held, "subagents_named_in_task": named},
                              held_for_delegation=held)
     return None

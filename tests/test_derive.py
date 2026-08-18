@@ -251,3 +251,23 @@ def test_l2_root_holds_the_delegation_subtree_closure_too():
               subagent_tools={"ops_agent": ["read_file", "Bash", "send_email"]}, parent_authority=WIDE)
     a2, r2 = d.propose(ev2)
     assert a2.covers_scope("fs.read") and not a2.covers_scope("code.exec") and not a2.covers_scope("mail.send")   # tier 2 never held via heuristics/L2 closure
+
+
+def test_delegating_writer_grants_only_the_named_subagents_when_the_task_names_them():
+    """T21 follow-up: with the declared roster in the input, unused delegate scopes became visible. When the task text names
+    the specialists it wants, the template grants agent.delegate.* for THOSE only (derived from the task); if it names none,
+    the whole roster (it cannot know)."""
+    d = Deriver()
+    roster = ["researcher", "security-reviewer", "test-analyst", "api-surveyor"]
+    a1, r1 = d.propose(_ev(task="Write TESTING_STRATEGY.md: the test-analyst maps the suite, the api-surveyor lists entry points. Delegate all reading to them; write the file yourself.",
+                           role="root", agent="orchestrator", tools_available=["task", "write_file", "read_file"], declared_subagents=roster, parent_authority=WIDE))
+    assert r1.template == "delegating-writer"
+    assert a1.covers_scope("agent.delegate.test-analyst") and a1.covers_scope("agent.delegate.api-surveyor")
+    assert not a1.covers_scope("agent.delegate.researcher") and not a1.covers_scope("agent.delegate.security-reviewer")
+    a2, r2 = d.propose(_ev(task="Produce REPORT.md; delegate the reading to your sub-agents and write the file yourself.",
+                           role="root", agent="orchestrator", tools_available=["task", "write_file"], declared_subagents=roster, parent_authority=WIDE))
+    assert all(a2.covers_scope(f"agent.delegate.{s}") for s in roster)                 # names none -> whole roster
+    a3, r3 = d.propose(_ev(task="Delegate every reading task to the security_reviewer and the test_analyst; write ONBOARDING.md.",
+                           role="root", agent="orchestrator", tools_available=["write_file", "security_reviewer", "test_analyst", "researcher"],
+                           declared_subagents=["researcher", "security_reviewer", "test_analyst"], parent_authority=WIDE))
+    assert a3.covers_scope("agent.delegate.security_reviewer") and a3.covers_scope("agent.delegate.test_analyst") and not a3.covers_scope("agent.delegate.researcher")

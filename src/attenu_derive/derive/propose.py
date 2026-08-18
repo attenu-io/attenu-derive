@@ -170,11 +170,13 @@ class Deriver:
 def event_from_row(row: dict, task_text: str | None = None) -> DelegationEvent:
     fw = row.get("framework", ""); agent = row.get("agent", "")
     tools = list(row["tools_available"]) if row.get("tools_available") else tools_for(fw, agent, sorted({c["tool"] for c in row.get("child_calls", [])}))
-    sub_tools = subagent_tools_for(fw, list(row.get("delegated_to") or []), row.get("subagent_tools"))
+    # T21: the DECLARED roster (available at derivation time) — never the observed spawns, which leak the outcome into the input.
+    declared = list(row["declared_subagents"]) if row.get("declared_subagents") is not None else list(row.get("delegated_to") or [])
+    sub_tools = subagent_tools_for(fw, declared, row.get("subagent_tools"))
     parent = Authority({"fs.*", "data.*", "crm.*", "mail.*", "payments.*", "db.*", "web.*", "code.exec", "compute.pure", "device.actuate", "agent.delegate.*", "agent.message"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)   # the WHOLE vocabulary: the eval's stand-in for an operator who holds everything, so only the deriver decides (a real observe root held observe.*)
     return DelegationEvent(task=task_text if task_text is not None else (row.get("task") or ""),
                            role="root" if row.get("parent_node") is None else "child", agent=agent,
-                           tools_available=tools, parent_authority=parent, declared_subagents=list(row.get("delegated_to") or []),   # no phantom sub-agent (found on a real single-agent app)
+                           tools_available=tools, parent_authority=parent, declared_subagents=declared,   # declared roster; no phantom sub-agent
                            subagent_tools=sub_tools)
 
 

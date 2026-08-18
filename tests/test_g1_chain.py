@@ -83,3 +83,28 @@ def test_gold_marks_writes_as_negatives_when_the_role_forbids_them():
     row2 = dict(row, role_constraints={})
     g2 = label_row(row2, load_catalog())
     assert "write_file" not in g2["negatives"] and "fs.write" in g2["label"]["scopes"]        # without the constraint the v0 default stands
+
+
+def test_declared_subagents_come_from_the_roster_not_from_observed_spawns():
+    """T21 (eval leak): a root's declared sub-agents must be what the app DECLARES (available at derivation time), not the
+    set it happened to spawn — otherwise agent.delegate.* can never be a benign-deny and unused delegate scopes are invisible."""
+    from attenu_derive.derive.propose import event_from_row
+    row = {"node": "n0", "parent_node": None, "agent": "orchestrator", "framework": "langchain/deepagents", "task": "Produce REPORT.md, delegate reading",
+           "delegated_to": ["researcher"], "declared_subagents": ["researcher", "security-reviewer", "test-analyst", "api-surveyor"],
+           "child_calls": [], "observed_envelope": {"tools": ["task", "write_file"], "quantities_max": {}}}
+    ev = event_from_row(row, task_text=row["task"])
+    assert ev.declared_subagents == ["researcher", "security-reviewer", "test-analyst", "api-surveyor"]
+    assert set(ev.subagent_tools) == set(ev.declared_subagents)
+    from attenu_derive.eval.g1 import score
+    from attenu_derive.catalog.coverage import load_catalog
+    from attenu_derive.derive.propose import Deriver
+    g = dict(_root(), task="Produce REPORT.md; delegate all reading to your sub-agents; write only the final file yourself.",   # names none
+             delegated_to=["researcher"], declared_subagents=["researcher", "security-reviewer"])
+    s = score([g, _child()], Deriver(), load_catalog(), parent="chain")
+    root_row = next(r for r in s["per_row"] if r["agent"] == "orchestrator")
+    assert "agent.delegate.security-reviewer" in root_row["unused"]                       # a declared-but-unused delegate is now VISIBLE as unused
+    assert "agent.delegate.researcher" not in root_row["unused"]
+    g2 = dict(g, task=ROOT_TASK)                                                            # names "researcher" -> the other is not granted at all (derived from the task)
+    s2 = score([g2, _child()], Deriver(), load_catalog(), parent="chain")
+    root_row2 = next(r for r in s2["per_row"] if r["agent"] == "orchestrator")
+    assert "agent.delegate.security-reviewer" not in root_row2["granted"] and "agent.delegate.researcher" in root_row2["granted"]

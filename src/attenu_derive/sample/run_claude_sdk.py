@@ -217,6 +217,8 @@ def main(argv=None) -> int:
         for r, mr in zip(rows, mrows):
             if r["parent_node"] is not None:
                 r["role_constraints"] = mr["role_constraints"] = {"no_write": True}          # every specialist is defined "Do NOT write files"
+            else:
+                r["declared_subagents"] = mr["declared_subagents"] = list(SPECIALISTS) + ["general-purpose"]   # T21: the declared roster (agents= + built-in)
             if r["parent_node"] is None:
                 r["task_hash"] = hashlib.sha256(f"{salt}\x1f{task}".encode()).hexdigest()[:16]; mr["task"] = task
             else:

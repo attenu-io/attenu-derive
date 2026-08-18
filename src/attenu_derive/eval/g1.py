@@ -67,7 +67,8 @@ def score(rows: list[dict], deriver: Deriver, cat: dict, parent: str = "chain") 
     for idx, g in enumerate(rows):
         role = "root" if g.get("role") == "orchestrator" or g.get("agent") == "orchestrator" else "child"
         tools_available = list(g["tools_available"]) if g.get("tools_available") else tools_for(g["framework"], g["agent"], g["observed_envelope"]["tools"])
-        sub_tools = subagent_tools_for(g["framework"], list(g.get("delegated_to") or []), g.get("subagent_tools"))
+        declared = list(g["declared_subagents"]) if g.get("declared_subagents") is not None else list(g.get("delegated_to") or [])   # T21: roster, not observed spawns
+        sub_tools = subagent_tools_for(g["framework"], declared, g.get("subagent_tools"))
         key = (_run_key(g), g.get("node") or g["event_id"]); pkey = (_run_key(g), g.get("parent_node")) if g.get("parent_node") else None
         node_key[idx] = key
         if parent == "chain" and pkey is not None and pkey in derived:
@@ -75,7 +76,7 @@ def score(rows: list[dict], deriver: Deriver, cat: dict, parent: str = "chain") 
         else:
             parent_auth = OBSERVE_PARENT
         ev = DelegationEvent(task=g.get("task") or "", role=role, agent=g["agent"], tools_available=tools_available,
-                             parent_authority=parent_auth, declared_subagents=list(g.get("delegated_to") or []), subagent_tools=sub_tools)
+                             parent_authority=parent_auth, declared_subagents=declared, subagent_tools=sub_tools)
         granted, rec = deriver.propose(ev)
         derived[key] = granted; layers[rec.layer] += 1; n += 1
         if not granted.is_narrower_than(parent_auth):
