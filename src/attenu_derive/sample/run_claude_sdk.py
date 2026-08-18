@@ -57,7 +57,7 @@ SPECIALISTS = {   # T5 fan-out: one task -> several delegations (events per run 
 FANOUT_TASKS = [
     "Produce REPORT.md for this repository with four sections: architecture, security-relevant paths, tests, public API. "
     "Delegate EACH section to its specialist subagent (researcher, security-reviewer, test-analyst, api-surveyor) via the Agent tool, "
-    "in parallel where possible; do all reading through them; then write REPORT.md yourself and finish.",
+    "one after another (foreground, not background); do all reading through them; then write REPORT.md yourself and finish.",
     "Write ONBOARDING.md for a new contributor: how the code is organized (researcher), what to be careful about security-wise "
     "(security-reviewer), how to run the tests (test-analyst), and which public APIs matter (api-surveyor). Delegate every "
     "reading task to those subagents; write only the final file yourself.",
@@ -78,7 +78,7 @@ def make_registry(salt: str):
     return root, reg
 
 
-async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: int, budget: float, timeout_s: float = 600.0):
+async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: int, budget: float, timeout_s: float = 600.0, trace: Path | None = None):
     from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, HookMatcher, ResultMessage, query
 
     root, reg = make_registry(salt)
@@ -100,7 +100,9 @@ async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: i
         allowed_tools=["Read", "Grep", "Glob", "Write", "Agent"],
         disallowed_tools=["Bash", "WebFetch", "WebSearch", "Edit", "NotebookEdit"],
         permission_mode="acceptEdits",                   # scratch checkout; Write is the task's output
-        agents={name: AgentDefinition(description=desc, prompt=prompt, tools=["Read", "Grep", "Glob"], model=model)
+        # background=False: background subagents keep the CLI alive after the parent's ResultMessage, which a
+        # headless query() experiences as an idle hang (T5 stall root cause). Foreground only.
+        agents={name: AgentDefinition(description=desc, prompt=prompt, tools=["Read", "Grep", "Glob"], model=model, background=False)
                 for name, (desc, prompt) in SPECIALISTS.items()},
         hooks=hooks,
         max_turns=max_turns,
@@ -119,6 +121,12 @@ async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: i
     async def _consume():
         nonlocal status, usage, cost
         async for message in query(prompt=_prompt(), options=options):
+            if trace is not None:                                   # diagnostic stream: message type + tool names + timestamps
+                with trace.open("a") as fh:
+                    kinds = []
+                    for b in getattr(message, "content", []) or []:
+                        n = getattr(b, "name", None); kinds.append(f"{type(b).__name__}{'(' + n + ')' if n else ''}")
+                    fh.write(f"{time.strftime('%H:%M:%S')} {type(message).__name__} {getattr(message, 'subtype', '')} {' '.join(kinds)}\n")
             if isinstance(message, ResultMessage):
                 status = f"result:{message.subtype}"
                 usage = dict(getattr(message, "usage", None) or {})
@@ -144,14 +152,18 @@ def main(argv=None) -> int:
     ap.add_argument("--fanout", action="store_true", help="use the fan-out task set (4 specialist subagents per task)")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-turns", type=int, default=40)
-    ap.add_argument("--budget-usd", type=float, default=3.0, help="SDK notional cap per task (subscription-billed)")
+    ap.add_argument("--budget-usd", type=float, default=5.0, help="SDK notional cap per task (subscription-billed; fan-out tasks need ~3-5)")
     ap.add_argument("--timeout-s", type=float, default=600.0, help="HARD per-task wall-clock cap (guardrail against stalled CLI)")
+    ap.add_argument("--task-index", type=int, default=None, help="run only this task index from the task set")
+    ap.add_argument("--trace", action="store_true", help="write a message-stream trace per task to the run dir (diagnostics)")
     args = ap.parse_args(argv)
 
     repo = Path(args.repo).resolve(); project = args.project or repo.name
     tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (FANOUT_TASKS if args.fanout else DEFAULT_TASKS)
     if args.limit:
         tasks = tasks[: args.limit]
+    if args.task_index is not None:
+        tasks = [tasks[args.task_index]]
     run_id = time.strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(3)
     salt = secrets.token_hex(16)
     out = Path(args.out)
@@ -164,7 +176,8 @@ def main(argv=None) -> int:
     for i, task in enumerate(tasks):
         t0 = time.time()
         root, reg, delegations, status, usage, cost = asyncio.run(
-            run_task(task, repo=repo, model=args.model, salt=salt, max_turns=args.max_turns, budget=args.budget_usd, timeout_s=args.timeout_s))
+            run_task(task, repo=repo, model=args.model, salt=salt, max_turns=args.max_turns, budget=args.budget_usd, timeout_s=args.timeout_s,
+                     trace=(out / "runs" / run_id / f"task{i}-trace.log") if args.trace else None))
         entries = root.audit_log().entries
         (out / "runs" / run_id / f"task{i}-audit.jsonl").write_text(
             "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
