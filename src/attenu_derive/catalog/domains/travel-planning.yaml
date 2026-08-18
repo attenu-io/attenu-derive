@@ -1,0 +1,15 @@
+# Domain catalog pack — travel planning (T32, day-0 onboarding of google/adk-samples travel-concierge, held out
+# of all training). Curated by following docs/ONBOARDING.md. The two money tools are tier-2 requires_grant.
+domain: travel-planning
+version: 1
+tools:
+  google_search:          {scope: web.search, consumes: {}, tier: 1}
+  google_search_grounding: {scope: web.search, consumes: {}, tier: 1}
+  event_booking_check:    {scope: data.read, consumes: {}, tier: 0}
+  flight_status_check:    {scope: data.read, consumes: {}, tier: 0}
+  weather_impact_check:   {scope: data.read, consumes: {}, tier: 0}
+  payment_choice:         {scope: data.read, consumes: {}, tier: 0}   # lists the customer's payment options; does not move money
+  memorize:               {scope: state.write, consumes: {}, tier: 0} # internal scratch: remembers trip context
+  # money tools — curated but HELD pending an explicit operator grant:
+  create_reservation:     {scope: payments.transfer, consumes: {}, tier: 2, requires_grant: true}
+  process_payment:        {scope: payments.transfer, consumes: {amount: spend}, tier: 2, requires_grant: true}
