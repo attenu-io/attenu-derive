@@ -115,8 +115,10 @@ def render(a: dict) -> str:
               "  is UNENFORCEABLE under monotonic attenuation — a parent cannot delegate what it does not hold. Triage:",
               "  the delegating-writer must hold the read families its declared sub-agents' tools resolve to (held FOR",
               "  delegation), and the unused-scope metric + rubric must count a descendant's use as the ancestor's use",
-              "  (transitive). Decision owner: PM (rubric v1.2 + templates + metric). Until then G2's '0 benign blocks'",
-              "  is not evidence-able."]
+              "  (transitive). RESOLVED 2026-08-18 (rubric v1.2, PM-approved): parents hold the read families of their",
+              "  delegation subtree (marked held_for_delegation), G1 gates on the real chain, transitive use with the",
+              "  'no one uses it -> still unused' pin. Post-fix: 0 would-be blocks over every sampled run (target 0);",
+              "  a non-zero R8 from here on is a new finding to triage, not this class."]
     return "\n".join(lines) + "\n"
 
 
