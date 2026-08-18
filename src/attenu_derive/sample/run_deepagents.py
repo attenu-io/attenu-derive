@@ -88,6 +88,45 @@ def make_guarded(salt: str) -> tuple[Guard, GuardedDelegation]:
     return root, guarded
 
 
+# Public list prices (USD per 1M tokens) for the models we sample with — for HONEST run manifests
+# and budget guardrails; update when prices change. Unknown model -> conservative Sonnet-class.
+_PRICES = {"claude-haiku-4-5": (1.0, 5.0), "claude-sonnet-4-5": (3.0, 15.0), "claude-sonnet-4": (3.0, 15.0), "claude-opus": (15.0, 75.0)}
+
+
+def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    pin, pout = next((v for k, v in _PRICES.items() if model.startswith(k)), (3.0, 15.0))
+    return input_tokens / 1e6 * pin + output_tokens / 1e6 * pout
+
+
+class BudgetExceeded(RuntimeError):
+    pass
+
+
+class _BudgetGuard:
+    """LangChain callback that ABORTS the run when cumulative input tokens pass the budget —
+    a looping agent re-sends its whole transcript every step, so a per-task hard cap is the
+    only reliable cost guardrail (recursion limits alone let 100+ steps × growing context through)."""
+    raise_error = True          # make LangChain propagate our exception instead of logging it
+    ignore_llm = False; ignore_chain = True; ignore_agent = True; ignore_retriever = True; ignore_chat_model = False
+    ignore_retry = True; ignore_custom_event = True
+
+    def __init__(self, max_input_tokens: int):
+        self.max = max_input_tokens; self.used = 0
+
+    def on_llm_end(self, response, **kwargs):
+        for gen_list in getattr(response, "generations", []) or []:
+            for gen in gen_list:
+                msg = getattr(gen, "message", None); um = getattr(msg, "usage_metadata", None) or {}
+                self.used += int(um.get("input_tokens", 0) or 0)
+        if self.used > self.max:
+            raise BudgetExceeded(f"input-token budget exceeded: {self.used} > {self.max}")
+
+    def __getattr__(self, name):        # every other callback hook is a no-op
+        if name.startswith("on_"):
+            return lambda *a, **k: None
+        raise AttributeError(name)
+
+
 def usage_of(out: dict) -> dict:
     tot = {"input_tokens": 0, "output_tokens": 0}
     for m in out.get("messages", []):
@@ -105,15 +144,20 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="claude-haiku-4-5-20251001")
     ap.add_argument("--tasks", default=None, help="file with one task per line (default: built-in 5)")
     ap.add_argument("--limit", type=int, default=None, help="only run the first N tasks")
-    ap.add_argument("--recursion-limit", type=int, default=150)
+    ap.add_argument("--recursion-limit", type=int, default=40)
     ap.add_argument("--max-tokens", type=int, default=2048)
+    ap.add_argument("--max-input-tokens", type=int, default=300_000,
+                    help="HARD per-task budget: abort the run once cumulative input tokens exceed this (cost guardrail)")
     args = ap.parse_args(argv)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ANTHROPIC_API_KEY not set — `set -a; source ~/.attenu/keys.env; set +a`", file=sys.stderr)
         return 2
     from langchain_anthropic import ChatAnthropic
-    model = ChatAnthropic(model=args.model, max_tokens=args.max_tokens, temperature=0)
+    # Prompt caching (top-level cache_control = automatic prefix caching on the direct Anthropic API):
+    # a looping agent re-sends its growing transcript every step; cache reads bill at ~10%.
+    model = ChatAnthropic(model=args.model, max_tokens=args.max_tokens, temperature=0,
+                          model_kwargs={"cache_control": {"type": "ephemeral"}})
 
     repo = Path(args.repo).resolve()
     project = args.project or repo.name
@@ -138,15 +182,17 @@ def main(argv=None) -> int:
         # (e.g. GraphRecursionError) — the audit log is complete either way.
         from langchain_core.callbacks import UsageMetadataCallbackHandler
         cb = UsageMetadataCallbackHandler()
+        guard_cb = _BudgetGuard(args.max_input_tokens)
         try:
             agent.invoke({"messages": [("user", task)]},
-                         config={"recursion_limit": args.recursion_limit, "callbacks": [cb]})
-        except Exception as exc:  # keep sampling; record the failure
+                         config={"recursion_limit": args.recursion_limit, "callbacks": [cb, guard_cb]})
+        except Exception as exc:  # keep sampling; record the failure (incl. BudgetExceeded)
             status = f"error: {type(exc).__name__}: {str(exc)[:120]}"
         usage = {"input_tokens": 0, "output_tokens": 0}
         for m in (cb.usage_metadata or {}).values():
             usage["input_tokens"] += int(m.get("input_tokens", 0) or 0)
             usage["output_tokens"] += int(m.get("output_tokens", 0) or 0)
+        usage["est_cost_usd"] = round(estimate_cost(args.model, usage["input_tokens"], usage["output_tokens"]), 4)
         entries = root.audit_log().entries
         (out / "runs" / run_id / f"task{i}-audit.jsonl").write_text(
             "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
@@ -178,7 +224,8 @@ def main(argv=None) -> int:
                            "rows": len(corpus_rows),
                            "tool_calls": sum(len(r["child_calls"]) for r in corpus_rows),
                            "input_tokens": sum(p["usage"].get("input_tokens", 0) for p in per_task),
-                           "output_tokens": sum(p["usage"].get("output_tokens", 0) for p in per_task)}}
+                           "output_tokens": sum(p["usage"].get("output_tokens", 0) for p in per_task),
+                           "est_cost_usd": round(sum(p["usage"].get("est_cost_usd", 0) for p in per_task), 4)}}
     (out / "runs" / run_id / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(json.dumps(manifest["totals"]))
     return 0
