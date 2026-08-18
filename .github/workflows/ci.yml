@@ -7,6 +7,16 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
-      - run: |
-          pip install -q -e '.[dev]' 'delegation-guard @ git+https://github.com/rafaelasor/delegation-guard.git' 2>/dev/null || pip install -q -e '.[dev]' --no-deps
-          python -m pytest -q
+      - name: Install (delegation-guard is a PRIVATE sibling repo — installed via DG_READ_TOKEN when set; P0 follow-up: add that secret)
+        env: { DG_READ_TOKEN: "${{ secrets.DG_READ_TOKEN }}" }
+        run: |
+          python -m pip install -q --upgrade pip
+          pip install -q pytest hypothesis
+          if [ -n "$DG_READ_TOKEN" ]; then
+            pip install -q "delegation-guard @ git+https://x-access-token:${DG_READ_TOKEN}@github.com/rafaelasor/delegation-guard.git"
+            pip install -q -e .
+          else
+            echo "::warning::DG_READ_TOKEN not set — installing without delegation-guard"
+            pip install -q -e . --no-deps
+          fi
+      - run: python -m pytest -q
