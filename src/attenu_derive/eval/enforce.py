@@ -41,15 +41,17 @@ def _deriver_for(project: str) -> Deriver:
     return Deriver(domain=load_domain(name), operator_grants=grants)
 
 
-def enforce_project(rows_by_run: list[list[dict]], project: str) -> dict:
+def enforce_project(runs: list[tuple], project: str) -> dict:
+    """runs = [(rows, neg_by_node), ...] — one per run file; neg_by_node maps a node to the gold's over-reach negatives."""
     d = _deriver_for(project); cat = load_catalog()
-    benign = 0; benign_blocks = 0; block_detail = []
+    benign = 0; benign_blocks = 0; overreach_blocked = 0; block_detail = []
     inj = blk = 0; scope_inj = scope_blk = 0; misses = []
-    negs = sh._gold_negatives()
-    for rows in rows_by_run:
-        # benign: shadow with this project's deriver (domain pack applied)
-        srep = sh.shadow(rows, d, cat)
-        benign += srep["calls"]; benign_blocks += srep["would_block"]
+    for run in runs:
+        rows, neg_by_node = run if isinstance(run, tuple) else (run, {})
+        # A recorded call the gold marks as over-reach (role violation, e.g. a no_write specialist that wrote) is a
+        # block we WANT — blocked_overreach, NOT a benign block. shadow_files applies this join; enforce must too.
+        srep = sh.shadow(rows, d, cat, negatives_by_node=neg_by_node)
+        benign += srep["calls"]; benign_blocks += srep["would_block"]; overreach_blocked += srep["blocked_overreach"]
         block_detail += [(b["agent"], b["tool"], b["scope"], b["cause"]) for b in srep["blocks"]]
         # over-reach: adversarial with the same deriver
         arep = adv.adversarial(rows, d, cat)
@@ -57,7 +59,7 @@ def enforce_project(rows_by_run: list[list[dict]], project: str) -> dict:
         scope_inj += arep["by_class"]["scope"]["injected"]; scope_blk += arep["by_class"]["scope"]["blocked"]
         misses += arep["misses"]
     return {"project": project, "domain": PROJECT_DOMAINS.get(project, (None, None))[0],
-            "benign_calls": benign, "benign_blocks": benign_blocks,
+            "benign_calls": benign, "benign_blocks": benign_blocks, "overreach_blocked_role": overreach_blocked,
             "overreach_injected": inj, "overreach_blocked": blk,
             "overreach_blocked_rate": round(blk / inj, 4) if inj else None,
             "scope_blocked_rate": round(scope_blk / scope_inj, 4) if scope_inj else None,
@@ -65,11 +67,13 @@ def enforce_project(rows_by_run: list[list[dict]], project: str) -> dict:
 
 
 def enforce_files(paths: list[Path]) -> dict:
-    by_project = defaultdict(list)
+    negs = sh._gold_negatives(); by_project = defaultdict(list)
     for p in paths:
         rows = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
-        if rows:
-            by_project[rows[0].get("project")].append(rows)
+        if not rows:
+            continue
+        neg_by_node = {r["node"]: negs[(sh._run_key_of(p, r), r["node"])] for r in rows if (sh._run_key_of(p, r), r["node"]) in negs}
+        by_project[rows[0].get("project")].append((rows, neg_by_node))
     reports = {proj: enforce_project(runs, proj) for proj, runs in sorted(by_project.items())}
     return {"date": time.strftime("%Y-%m-%d"), "projects": reports}
 
