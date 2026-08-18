@@ -1,0 +1,97 @@
+# Tool -> scope catalog v1 (P1). Versioned static artifact (ADR: shipped with the library,
+# never a service). Success metric = GRANTABLE COVERAGE of sampled tool calls (share of recorded
+# calls whose tool resolves to a curated entry or a tier<=1 heuristic family), not entry count.
+# Entries: scope(s) in the closed vocabulary; the ceiling dimensions the tool consumes (which
+# context/arg fields map to which ceiling); risk tier. Resolution: exact -> glob pattern -> the
+# token heuristic tier (`heuristics.py`, flagged, tier<=1 grantable / tier-2 withheld) -> unresolved.
+# v1 (2026-08-18, T7): curated tier-2 verbs, POSIX shell commands and SGD-style patterns from public
+# benchmark traffic (BFCL v4, Apache-2.0) — GENERIC names only; benchmark-specific names are labelled.
+version: 1
+match: exact-then-glob-then-heuristic
+tools:
+  # --- LangChain deepagents built-ins ------------------------------------------------------
+  ls:          {scope: fs.read,  consumes: {}, tier: 0}
+  glob:        {scope: fs.read,  consumes: {}, tier: 0}
+  grep:        {scope: fs.read,  consumes: {}, tier: 0}
+  read_file:   {scope: fs.read,  consumes: {limit: max_rows, offset: null}, tier: 0}
+  write_file:  {scope: fs.write, consumes: {content: bytes}, tier: 1}
+  edit_file:   {scope: fs.write, consumes: {}, tier: 1}
+  delete:      {scope: fs.delete, consumes: {}, tier: 2}
+  write_todos: {scope: state.write, consumes: {}, tier: 0}
+  task:        {scope: agent.delegate, consumes: {subagent_type: delegate_target}, tier: 1}
+  # --- Claude Code / Claude Agent SDK built-ins --------------------------------------------
+  Read:        {scope: fs.read,  consumes: {limit: max_rows, offset: null}, tier: 0}
+  Glob:        {scope: fs.read,  consumes: {}, tier: 0}
+  Grep:        {scope: fs.read,  consumes: {head_limit: max_rows}, tier: 0}
+  Write:       {scope: fs.write, consumes: {content: bytes}, tier: 1}
+  Edit:        {scope: fs.write, consumes: {}, tier: 1}
+  NotebookEdit: {scope: fs.write, consumes: {}, tier: 1}
+  Bash:        {scope: code.exec, consumes: {}, tier: 2}
+  WebFetch:    {scope: web.fetch, consumes: {url: egress}, tier: 1}
+  WebSearch:   {scope: web.search, consumes: {}, tier: 1}
+  Agent:       {scope: agent.delegate, consumes: {subagent_type: delegate_target}, tier: 1}
+  Task:        {scope: agent.delegate, consumes: {subagent_type: delegate_target}, tier: 1}
+  SendMessage: {scope: agent.message, consumes: {}, tier: 1}
+  ListAgents:  {scope: agent.message, consumes: {}, tier: 1}    # teammate discovery — messaging family (curated from cobra sampling)
+  TodoWrite:   {scope: state.write, consumes: {}, tier: 0}
+  # --- framework demo tools (delegation-guard examples) -----------------------------------
+  crm_query:   {scope: crm.read,   consumes: {rows: max_rows}, tier: 1}
+  crm_export:  {scope: crm.export, consumes: {destination: egress}, tier: 2}
+  send_mail:   {scope: mail.send,  consumes: {to: egress}, tier: 2}
+  # --- POSIX shell / GorillaFileSystem-style commands (the tool name IS the command) --------
+  cat:  {scope: fs.read,  consumes: {}, tier: 0}
+  cd:   {scope: fs.read,  consumes: {}, tier: 0}
+  pwd:  {scope: fs.read,  consumes: {}, tier: 0}
+  find: {scope: fs.read,  consumes: {}, tier: 0}
+  wc:   {scope: fs.read,  consumes: {}, tier: 0}
+  tail: {scope: fs.read,  consumes: {}, tier: 0}
+  head: {scope: fs.read,  consumes: {}, tier: 0}
+  diff: {scope: fs.read,  consumes: {}, tier: 0}
+  du:   {scope: fs.read,  consumes: {}, tier: 0}
+  echo: {scope: fs.read,  consumes: {}, tier: 0}
+  sort: {scope: fs.read,  consumes: {}, tier: 0}
+  tree: {scope: fs.read,  consumes: {}, tier: 0}
+  mkdir: {scope: fs.write, consumes: {}, tier: 1}
+  touch: {scope: fs.write, consumes: {}, tier: 1}
+  mv:    {scope: fs.write, consumes: {}, tier: 1}
+  cp:    {scope: fs.write, consumes: {}, tier: 1}
+  rm:    {scope: fs.delete, consumes: {}, tier: 2}
+  rmdir: {scope: fs.delete, consumes: {}, tier: 2}
+  # --- common tier-2 API verbs (generic names; curated because heuristics may never grant tier 2) --
+  send_email:   {scope: mail.send, consumes: {to: egress}, tier: 2}
+  send_message: {scope: mail.send, consumes: {}, tier: 2}
+  send_sms:     {scope: mail.send, consumes: {}, tier: 2}
+  post_tweet:   {scope: mail.send, consumes: {}, tier: 2}     # public post = egress
+  retweet:      {scope: mail.send, consumes: {}, tier: 2}
+  comment:      {scope: mail.send, consumes: {}, tier: 2}
+  book_flight:  {scope: payments.transfer, consumes: {}, tier: 2}
+  book_hotel:   {scope: payments.transfer, consumes: {}, tier: 2}
+  book_room:    {scope: payments.transfer, consumes: {}, tier: 2}
+  hotel_booking: {scope: payments.transfer, consumes: {}, tier: 2}
+  cancel_order:   {scope: payments.transfer, consumes: {}, tier: 2}   # money-relevant state change (refund path)
+  cancel_booking: {scope: payments.transfer, consumes: {}, tier: 2}
+  purchase_insurance: {scope: payments.transfer, consumes: {}, tier: 2}
+  make_payment:    {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  request_payment: {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  transfer_money:  {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  fund_account:    {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  withdraw_funds:  {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  buy_stock:  {scope: payments.transfer, consumes: {}, tier: 2}
+  sell_stock: {scope: payments.transfer, consumes: {}, tier: 2}
+  delete_message: {scope: data.delete, consumes: {}, tier: 2}
+  close_ticket:   {scope: data.write,  consumes: {}, tier: 1}     # closing a ticket is a state write, not a delete
+  # --- BFCL v4 multi-turn suites (benchmark-specific names, labelled as such) ----------------
+  cmd_controller.execute:      {scope: code.exec, consumes: {}, tier: 2}         # BFCL: OS command execution
+  ControlAppliance.execute:    {scope: device.actuate, consumes: {}, tier: 1}    # BFCL: home appliance control
+  ThinQ_Connect:               {scope: device.actuate, consumes: {}, tier: 1}    # BFCL: LG ThinQ appliance
+  remove_stock_from_watchlist: {scope: data.delete, consumes: {}, tier: 2}       # BFCL: trading bot
+patterns:
+  "mcp__*__*": {scope: unknown.mcp, consumes: {}, tier: 2}    # MCP tools resolve to unknown until mapped
+  # SGD-style `Domain_N_VerbNoun` service names (BFCL v4 / Schema-Guided Dialogue): reads stay heuristic
+  # (Find*/Get*/Search*/Lookup*), the money-moving and actuation verbs are curated here.
+  "*_MakePayment":    {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  "*_RequestPayment": {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  "*_TransferMoney":  {scope: payments.transfer, consumes: {amount: spend}, tier: 2}
+  "*_Buy[A-Z]*":      {scope: payments.transfer, consumes: {}, tier: 2}          # BuyMovieTickets, BuyEventTickets, BuyBusTicket
+  "*_Reserve[A-Z]*":  {scope: payments.transfer, consumes: {}, tier: 2}          # ReserveHotel, ReserveRestaurant, ReserveCar, ReserveRoundtripFlights
+  "*_Play[A-Z]*":     {scope: device.actuate, consumes: {}, tier: 1}             # PlayMedia, PlayMovie

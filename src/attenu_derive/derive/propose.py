@@ -74,8 +74,8 @@ class Deriver:
         self.catalog = catalog or load_catalog()
 
     # ---- L2 -----------------------------------------------------------------------------
-    HEURISTIC_MAX_TIER = 1      # heuristic (uncurated) classifications may grant tier 0-1 families only;
-                                # tier-2 families (payments, mail.send, code.exec, deletes) need a curated entry
+    from attenu_derive.catalog.heuristics import HEURISTIC_MAX_GRANT_TIER as HEURISTIC_MAX_TIER   # heuristic (uncurated) classifications may grant tier 0-1
+                                # families only; tier-2 (payments, mail.send, code.exec, deletes) need a curated entry — one constant, shared with coverage
 
     def _l2(self, ev: DelegationEvent) -> tuple[dict, dict] | None:
         scopes: set[str] = set(); ceilings: list[dict] = []; unknown = []; consumed = set(); heuristic_used = []; withheld = []

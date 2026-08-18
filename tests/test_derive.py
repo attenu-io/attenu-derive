@@ -79,10 +79,36 @@ def test_latency_budget_l1_l2():
 def test_l2_heuristic_grants_low_risk_only_and_lowers_confidence():
     d = Deriver()
     wide = Authority({"data.*", "payments.*", "web.*"}, [], ttl=None)     # parent holds both families
-    ev = _ev(task="Check the weather and book the flight", role="child", agent="bot",
-             tools_available=["get_weather_forecast", "book_flight"], parent_authority=wide)
+    ev = _ev(task="Check the weather and place the order", role="child", agent="bot",
+             tools_available=["get_weather_forecast", "place_order"], parent_authority=wide)   # place_order: deliberately uncurated (catalog v1)
     auth, rec = d.propose(ev)
     assert rec.layer == "L2" and rec.confidence < 0.6
     assert auth.covers_scope("data.read")                        # tier-0 heuristic family: granted (low confidence)
     assert not auth.covers_scope("payments.transfer")            # tier-2 via heuristic: withheld (fail closed)
-    assert ("book_flight", "payments.transfer") in rec.evidence["withheld_heuristic"]
+    assert ("place_order", "payments.transfer") in rec.evidence["withheld_heuristic"]
+
+
+def test_t7_read_verb_tool_grantable_while_write_verb_tier2_withheld():
+    """T7 DoD: `get_order_details` -> data.read GRANTED; `place_order` -> payments.transfer still WITHHELD (heuristic)."""
+    d = Deriver()
+    wide = Authority({"data.*", "payments.*"}, [], ttl=None)
+    ev = _ev(task="Look up the order and then place a new one", role="child", agent="bot",
+             tools_available=["get_order_details", "place_order"], parent_authority=wide)
+    auth, rec = d.propose(ev)
+    assert rec.layer == "L2"
+    assert auth.covers_scope("data.read") and not auth.covers_scope("payments.transfer")
+    assert ("get_order_details", "data.read") in rec.evidence["heuristic_grants"]
+    assert ("place_order", "payments.transfer") in rec.evidence["withheld_heuristic"]
+
+
+def test_curated_tier2_entry_is_granted_bounded_by_parent():
+    """A CURATED tier-2 tool (book_flight, catalog v1) is granted at L2 — the parent's meet still bounds it."""
+    d = Deriver()
+    ev = _ev(task="Book the flight", role="child", agent="bot", tools_available=["book_flight"],
+             parent_authority=Authority({"payments.transfer"}, [], ttl=None))
+    auth, rec = d.propose(ev)
+    assert rec.layer == "L2" and auth.covers_scope("payments.transfer")
+    ev2 = _ev(task="Book the flight", role="child", agent="bot", tools_available=["book_flight"],
+              parent_authority=Authority({"data.read"}, [], ttl=None))              # parent lacks it -> meet removes it
+    auth2, rec2 = d.propose(ev2)
+    assert not auth2.covers_scope("payments.transfer")

@@ -67,6 +67,17 @@ FANOUT_TASKS = [
 ]
 
 
+FANOUT_TIMEOUT_S = 900.0     # PM decision 2026-08-18 (W2 T8): fan-out tasks (4 specialists) need more wall clock; fewer truncated rows
+PLAIN_TIMEOUT_S = 600.0
+
+
+def default_timeout_s(*, fanout: bool, explicit: float | None = None) -> float:
+    """Per-task wall-clock cap: an explicit --timeout-s wins; else 900 s on the fan-out path, 600 s otherwise."""
+    if explicit is not None:
+        return float(explicit)
+    return FANOUT_TIMEOUT_S if fanout else PLAIN_TIMEOUT_S
+
+
 def make_registry(salt: str):
     root = Guard.issue("orchestrator", OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     reg = DelegationGuardRegistry(
@@ -153,10 +164,11 @@ def main(argv=None) -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--budget-usd", type=float, default=5.0, help="SDK notional cap per task (subscription-billed; fan-out tasks need ~3-5)")
-    ap.add_argument("--timeout-s", type=float, default=600.0, help="HARD per-task wall-clock cap (guardrail against stalled CLI)")
+    ap.add_argument("--timeout-s", type=float, default=None, help="HARD per-task wall-clock cap (guardrail against stalled CLI); default 900 s with --fanout, else 600 s")
     ap.add_argument("--task-index", type=int, default=None, help="run only this task index from the task set")
     ap.add_argument("--trace", action="store_true", help="write a message-stream trace per task to the run dir (diagnostics)")
     args = ap.parse_args(argv)
+    args.timeout_s = default_timeout_s(fanout=args.fanout, explicit=args.timeout_s)
 
     repo = Path(args.repo).resolve(); project = args.project or repo.name
     tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (FANOUT_TASKS if args.fanout else DEFAULT_TASKS)

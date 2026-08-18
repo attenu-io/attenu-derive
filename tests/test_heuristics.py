@@ -33,3 +33,63 @@ def test_camelcase_and_prefixed_names_are_tokenized():
     assert heuristic_resolve("Weather_1_GetWeather")["scope"] == "data.read"
     assert heuristic_resolve("Hotels_4_SearchHotel")["scope"] == "data.read"
     assert heuristic_resolve("Restaurants_2_ReserveRestaurant")["scope"] in ("payments.transfer", "data.write")
+
+
+# ---- T7 (PM W2 slice, 2026-08-18): catalog v1 -------------------------------------------------------
+def test_read_verbs_beat_noun_matched_tier2_families():
+    """The class: a tier-2 family (payments/mail/delete/write) firing on a NOUN in a tool whose VERB is a read.
+    `get_order_details` -> payments.transfer was a benign-deny generator (G1 under-provisioning)."""
+    for name in ("get_order_details", "order_status_check", "library.search_book", "openlibrary.books_search",
+                 "nature_reserve.find_nearby", "hotel_booking.check_availability", "restaurant_search.find_closest",
+                 "get_settings", "list_payments", "check_booking_status", "get_closest_store"):
+        h = heuristic_resolve(name)
+        assert h and h["scope"] == "data.read" and h["tier"] == 0, (name, h)
+    # ...and the fix never widens: write/money verbs still land in their tier-2 family
+    assert heuristic_resolve("place_order") == {"scope": "payments.transfer", "tier": 2, "heuristic": True, "rule": heuristic_resolve("place_order")["rule"]}
+    assert heuristic_resolve("cancel_booking")["tier"] == 2
+    assert heuristic_resolve("delete_message")["scope"] == "data.delete"
+    assert heuristic_resolve("send_message")["scope"] == "mail.send"
+
+
+def test_device_actuation_family():
+    for name in ("pressBrakePedal", "fillFuelTank", "startEngine", "lockDoors", "setCruiseControl", "play_song",
+                 "Music_3_PlayMedia", "spotify.play", "connectBluetooth", "oven_preheat", "ControlAppliance.execute"):
+        h = heuristic_resolve(name)
+        assert h and h["scope"] == "device.actuate" and h["tier"] == 1, (name, h)
+    assert heuristic_resolve("displayCarStatus")["scope"] == "data.read"          # reads of device state stay reads
+    assert heuristic_resolve("check_tire_pressure")["scope"] == "data.read"
+
+
+def test_compute_lookup_write_and_handoff_families():
+    for name in ("predict_house_price", "solve_quadratic", "run_linear_regression", "t_test", "compound_interest",
+                 "liter_to_gallon", "generate_DNA_sequence", "sentiment_analysis", "geometry.circumference", "diabetes_prediction"):
+        assert heuristic_resolve(name)["scope"] == "compute.pure", name
+    for name in ("stock_price", "weather_forecast", "latest_exchange_rate", "air_quality", "movie_details.brief", "sports_ranking"):
+        assert heuristic_resolve(name)["scope"] == "data.read", name
+    assert heuristic_resolve("run_tests")["scope"] == "code.exec"                 # "run" without a math noun stays exec
+    for name in ("todo", "record", "inventory_management", "reschedule_event", "game.save_progress", "log_food", "add_stock_to_watchlist"):
+        assert heuristic_resolve(name)["scope"] == "data.write", name
+    for name in ("handover_to_human_agent", "transfer_to_human_agent", "contact_customer_support"):
+        assert heuristic_resolve(name)["scope"] == "agent.message", name
+    assert heuristic_resolve("retweet")["scope"] == "mail.send"
+    assert heuristic_resolve("frobnicate_zorb") is None                           # still fail-closed on nonsense
+
+
+def test_destructive_and_payment_instrument_writes_stay_tier2():
+    """Audit of the T7 rewrite: a hard-delete verb dominates wherever it sits; a write on a payment instrument is tier 2."""
+    assert heuristic_resolve("todo_delete")["scope"] == "data.delete"
+    assert heuristic_resolve("register_credit_card")["scope"] == "payments.transfer"
+    assert heuristic_resolve("add_payment_method")["scope"] == "payments.transfer"
+    assert heuristic_resolve("update_order")["scope"] == "payments.transfer"
+    assert heuristic_resolve("create_ticket")["scope"] == "data.write"          # support ticket: not money
+    assert heuristic_resolve("get_credit_card_balance")["scope"] == "data.read"  # reads stay reads
+
+
+def test_bucket_review_fixes():
+    assert heuristic_resolve("Homes_2_FindHomeByArea")["scope"] == "data.read"          # find is a lookup even next to "area"
+    assert heuristic_resolve("is_prime")["scope"] == "compute.pure"
+    assert heuristic_resolve("nfl_data.player_record")["scope"] != "device.actuate"
+    assert heuristic_resolve("get_outside_temperature_from_google")["scope"] == "data.read"
+    assert heuristic_resolve("duck_duck_go")["scope"] == "web.search" and heuristic_resolve("web_search")["scope"] == "web.search"
+    assert heuristic_resolve("create_histogram")["scope"] == "compute.pure"
+    assert heuristic_resolve("set_navigation")["scope"] == "device.actuate"

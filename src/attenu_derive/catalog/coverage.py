@@ -3,8 +3,11 @@ Catalog coverage over sampled corpora — the catalog's success metric (design �
 
     python -m attenu_derive.catalog.coverage data/corpus/*.jsonl
 
-Reports: share of recorded tool CALLS whose tool resolves in the catalog; share of delegation
-EVENTS fully resolvable at L2 (every call covered); the uncovered tools by count.
+Headline (T7, 2026-08-18) = GRANTABLE share of recorded tool CALLS: curated (exact/glob) entries +
+heuristic families of tier <= HEURISTIC_MAX_GRANT_TIER — what the deriver can actually grant.
+Reported apart: WITHHELD (tier-2 heuristics: resolvable, never granted — the curation backlog),
+UNRESOLVED (no entry, no family; `unknown.*` counts here). `calls_covered_share` (= resolvable,
+grantable + withheld) is kept for continuity but is NOT the headline. Same split per delegation EVENT.
 """
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ import yaml
 
 __all__ = ["load_catalog", "resolve", "coverage"]
 
-_CATALOG = Path(__file__).with_name("v0.yaml")
+_CATALOG = Path(__file__).with_name("v1.yaml")
 
 
 def load_catalog(path: Path = _CATALOG) -> dict:
@@ -39,30 +42,50 @@ def resolve(catalog: dict, tool: str, description: str = "", *, heuristics: bool
     return None
 
 
+def _classify(catalog: dict, tool: str, description: str = "") -> str:
+    """'curated' | 'heuristic' (grantable, tier<=max) | 'withheld' (heuristic tier>max) | 'unresolved'."""
+    from attenu_derive.catalog.heuristics import HEURISTIC_MAX_GRANT_TIER
+    e = resolve(catalog, tool, description)
+    if e is None or str(e.get("scope", "")).startswith("unknown."):
+        return "unresolved"
+    if e.get("heuristic"):
+        return "heuristic" if int(e.get("tier", 2)) <= HEURISTIC_MAX_GRANT_TIER else "withheld"
+    return "curated"
+
+
 def coverage(rows: list[dict], catalog: dict) -> dict:
-    """Coverage split by tier: EXACT/glob (curated) vs HEURISTIC (flagged leads) vs uncovered."""
-    calls = Counter(); uncovered = Counter(); heuristic = Counter(); events = 0; events_ok = 0; events_curated = 0
+    """Coverage split by grantability: curated + heuristic(tier<=1) = GRANTABLE; withheld (tier-2 heuristic); unresolved."""
+    calls = Counter(); by_class = {k: Counter() for k in ("curated", "heuristic", "withheld", "unresolved")}
+    events = 0; ev_grantable = 0; ev_resolvable = 0; ev_curated = 0
     for r in rows:
-        events += 1; ok = True; curated = True
+        events += 1; grantable = True; resolvable = True; curated = True
         for c in r.get("child_calls", []):
             calls[c["tool"]] += 1
-            e = resolve(catalog, c["tool"], c.get("description", ""))
-            if e is None:
-                uncovered[c["tool"]] += 1; ok = False; curated = False
-            elif e.get("heuristic"):
-                heuristic[c["tool"]] += 1; curated = False
-        events_ok += ok; events_curated += curated
-    n = sum(calls.values()); nh = sum(heuristic.values()); nu = sum(uncovered.values())
+            k = _classify(catalog, c["tool"], c.get("description", ""))
+            by_class[k][c["tool"]] += 1
+            if k != "curated": curated = False
+            if k in ("withheld", "unresolved"): grantable = False
+            if k == "unresolved": resolvable = False
+        ev_grantable += grantable; ev_resolvable += resolvable; ev_curated += curated
+    n = sum(calls.values()); cnt = {k: sum(v.values()) for k, v in by_class.items()}
+    share = lambda x: round(x / n, 4) if n else None                              # noqa: E731
+    eshare = lambda x: round(x / events, 4) if events else None                   # noqa: E731
     return {
         "calls": n,
-        "calls_covered_share": round((n - nu) / n, 4) if n else None,          # exact + heuristic
-        "calls_curated_share": round((n - nu - nh) / n, 4) if n else None,     # exact/glob only
-        "calls_heuristic_share": round(nh / n, 4) if n else None,
+        "calls_grantable_share": share(cnt["curated"] + cnt["heuristic"]),        # HEADLINE: what the deriver can grant
+        "calls_curated_share": share(cnt["curated"]),                              # exact/glob only
+        "calls_heuristic_share": share(cnt["heuristic"] + cnt["withheld"]),        # every heuristic classification (tier<=1 + withheld)
+        "calls_heuristic_grantable_share": share(cnt["heuristic"]),
+        "calls_withheld_share": share(cnt["withheld"]),                            # tier-2 heuristics: resolvable, never granted
+        "calls_unresolved_share": share(cnt["unresolved"]),
+        "calls_covered_share": share(n - cnt["unresolved"]),                       # resolvable — kept, not the headline
         "events": events,
-        "events_fully_resolvable_share": round(events_ok / events, 4) if events else None,
-        "events_curated_share": round(events_curated / events, 4) if events else None,
-        "uncovered_tools": dict(uncovered.most_common(40)),
-        "heuristic_tools_top": dict(heuristic.most_common(20)),
+        "events_grantable_share": eshare(ev_grantable),
+        "events_fully_resolvable_share": eshare(ev_resolvable),
+        "events_curated_share": eshare(ev_curated),
+        "uncovered_tools": dict(by_class["unresolved"].most_common(40)),
+        "withheld_tools_top": dict(by_class["withheld"].most_common(25)),
+        "heuristic_tools_top": dict(by_class["heuristic"].most_common(20)),
         "tools_seen": len(calls),
     }
 

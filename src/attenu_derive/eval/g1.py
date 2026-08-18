@@ -83,7 +83,9 @@ def score(rows: list[dict], deriver: Deriver, cat: dict) -> dict:
         per_row.append({"event_id": g["event_id"], "project": g["project"], "agent": g["agent"], "layer": rec.layer,
                         "template": rec.template, "granted": sorted(gscopes), "gold": sorted(gold_scopes),
                         "denied_benign": denied_here, "unused": sorted(unused)})
-    return {"rows": n, "rows_truncated": sum(1 for g in rows if g.get("truncated")), "rows_degenerate": sum(1 for g in rows if g.get("degenerate")), "benign_uses": benign_total,
+    n_trunc = sum(1 for g in rows if g.get("truncated")); n_degen = sum(1 for g in rows if g.get("degenerate"))
+    n_clean = sum(1 for g in rows if not g.get("truncated") and not g.get("degenerate"))   # the over-provision evidence base
+    return {"rows": n, "rows_truncated": n_trunc, "rows_degenerate": n_degen, "rows_clean": n_clean, "benign_uses": benign_total,
             "benign_deny_rate": round(benign_denied / benign_total, 4) if benign_total else None,
             "unused_scope_share": round(sum(unused_shares) / len(unused_shares), 4) if unused_shares else None,
             "over_provision_rows": over_prov, "escalation_count": escalations, "layer_mix": dict(layers), "per_row": per_row}
@@ -109,9 +111,9 @@ def main(argv=None) -> int:
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     (out / f"eval-card-{time.strftime('%Y%m%d')}.json").write_text(json.dumps({**card, "per_row_holdout": res["holdout"]["per_row"], "per_row_train": res["train"]["per_row"]}, indent=2))
     md = [f"# Eval card — {card['date']} (gold: {card['gold']}, hold-out: {args.holdout})", "",
-          "| split | rows | benign uses | benign_deny_rate | unused_scope_share | over_provision_rows | escalation_count | layers |", "|---|---|---|---|---|---|---|---|"]
+          "| split | rows | clean | benign uses | benign_deny_rate | unused_scope_share | over_provision_rows | escalation_count | layers |", "|---|---|---|---|---|---|---|---|---|"]
     for split in ("train", "holdout"):
-        s = card[split]; md.append(f"| {split} | {s['rows']} | {s['benign_uses']} | {s['benign_deny_rate']} | {s['unused_scope_share']} | {s['over_provision_rows']} | {s['escalation_count']} | {s['layer_mix']} |")
+        s = card[split]; md.append(f"| {split} | {s['rows']} | {s['rows_clean']} | {s['benign_uses']} | {s['benign_deny_rate']} | {s['unused_scope_share']} | {s['over_provision_rows']} | {s['escalation_count']} | {s['layer_mix']} |")
     (out / f"eval-card-{time.strftime('%Y%m%d')}.md").write_text("\n".join(md) + "\n")
     if args.check and THRESHOLDS.exists():
         th = json.loads(THRESHOLDS.read_text()); h = card["holdout"]; bad = []
