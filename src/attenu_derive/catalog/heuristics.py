@@ -46,9 +46,9 @@ COMPUTE_VERBS = {"calc", "calculate", "compute", "convert", "solve", "predict", 
                  "decode", "encrypt", "decrypt", "hash", "parse", "format", "summarize", "summarise", "extract", "tokenize",
                  "embed", "measure", "mix", "shuffle", "reverse", "concat", "concatenate", "sum", "multiply", "divide", "subtract",
                  "factorize", "interpolate", "extrapolate", "compose", "render", "design", "assess", "determine", "derive", "math",
-                 "train", "fit", "sort", "play", "answer", "evaluate", "rank", "score", "grade"}
-MAIL_VERBS = {"send", "post", "tweet", "retweet", "comment", "reply", "notify", "email", "mail", "sms", "dm", "mention", "chat",
-              "greet", "broadcast", "publish", "share", "ping", "announce", "contact"}
+                 "train", "fit", "sort", "play", "answer", "evaluate", "rank", "score", "grade", "transcribe", "synthesize", "visualize", "segment", "categorize", "annotate", "cluster"}
+MAIL_VERBS = {"send", "post", "tweet", "retweet", "reply", "notify", "sms", "dm", "broadcast", "publish", "share", "ping", "announce"}
+WEAK_MAIL = {"comment", "email", "mail", "mention", "chat", "greet", "contact"}     # nouns as often as verbs: yield to a read verb / an agent-noun
 PAY_VERBS = {"pay", "purchase", "buy", "sell", "book", "reserve", "place", "fund", "withdraw", "deposit", "trade", "checkout",
              "refund", "subscribe", "invest", "charge", "donate", "tip", "bid", "transfer", "wire", "remit", "spend"}
 DELETE_VERBS = {"delete", "remove", "clear", "cancel", "revoke", "drop", "purge", "erase", "destroy", "unsubscribe", "unregister",
@@ -62,7 +62,7 @@ WRITE_VERBS = {"create", "update", "edit", "put", "insert", "register", "resolve
                "migrate", "rollback", "increment", "decrement", "reorder", "set", "start", "stop", "activate", "deactivate",
                "adjust", "toggle", "enable", "disable", "lock", "unlock", "open", "turn", "switch", "increase", "decrease", "raise",
                "lower", "mute", "unmute", "pause", "resume", "restart", "reboot", "shutdown", "connect", "disconnect", "record",
-               "checkin", "assign", "unassign", "block", "unblock", "invite", "kick", "ban", "grant", "apply"}
+               "checkin", "assign", "unassign", "block", "unblock", "invite", "kick", "ban", "grant", "apply", "track"}
 EXEC_VERBS = {"exec", "shell", "bash", "eval", "spawn", "subprocess", "sh", "cmd", "command", "script"}
 CARRIER_VERBS = {"run", "execute", "perform", "do", "make", "handle", "process", "use", "invoke", "call", "trigger", "request",
                  "action"}
@@ -97,7 +97,10 @@ COMPUTE_NOUNS = {"math", "factorial", "hypot", "mean", "median", "std", "varianc
                  "calculator", "solver", "mixture", "recipe", "scale", "progression", "sequence", "pattern", "intersect", "zero",
                  "zeros", "trend", "trends", "revenue", "profit", "earnings", "repayment", "loan", "mortgage", "batting", "grossing",
                  "ppg", "performance", "impact", "potential", "identification", "recognition", "detection", "classification",
-                 "regressor", "reasoning", "llm", "chart", "histogram", "graph", "image", "beat", "hypothesis", "random", "t",
+                 "regressor", "reasoning", "llm", "chart", "histogram", "graph", "image", "beat", "hypothesis", "random", "t", "qr", "audio", "speech", "transcription",
+                 "extractor", "detector", "checker", "validator", "summarizer", "parser", "formatter", "encoder", "decoder", "tokenizer",
+                 "recommender", "optimizer", "predictor", "simulator", "estimator", "transcriber", "synthesizer", "segmenter", "visualizer",
+                 "planner", "scorer", "ranker", "matcher", "resolver", "normalizer", "labeler", "annotator", "embedder", "indicator",
                  "liter", "liters", "litre", "litres", "gallon", "gallons", "mile", "miles", "km", "kilometer", "kilometers", "kilometre",
                  "meter", "meters", "metre", "celsius", "fahrenheit", "kelvin", "pound", "pounds", "lb", "lbs", "kg", "kilogram",
                  "kilograms", "gram", "grams", "ounce", "ounces", "inch", "inches", "feet", "foot", "cm", "mm", "radians", "degrees",
@@ -110,7 +113,10 @@ LOOKUP_NOUNS = {"weather", "temperature", "humidity", "precipitation", "air", "q
                 "attractions", "nearby", "closest", "nearest", "availability", "balance", "summary", "overview", "profile", "brief",
                 "listing", "listings", "location", "coordinates", "timezone", "time", "date", "calendar", "events", "event", "matches",
                 "match", "games", "game", "highest", "lowest", "latest", "current", "top", "count", "size", "length", "route",
-                "routes", "routing", "directions", "eta", "products", "product", "items", "item", "prices", "menu", "hours", "address"}
+                "routes", "routing", "directions", "eta", "products", "product", "items", "item", "prices", "menu", "hours", "address",
+                "filings", "stations", "station", "airports", "airport", "timezones", "autocomplete", "suggestions", "geocode", "geocoding",
+                "holidays", "transit", "flights", "hotels", "restaurants", "movies", "shows", "articles", "headlines", "trending", "metadata",
+                "lookup", "finder", "search", "mobility", "trends", "quotes", "tickers", "symbols", "definitions", "definition", "dictionary"}
 EXEC_NOUNS = {"shell", "bash", "command", "cmd", "script", "terminal", "python", "code", "subprocess", "sh", "controller"}
 PAY_NOUNS = {"payment", "payments", "order", "orders", "booking", "bookings", "reservation", "reservations", "purchase", "purchases",
              "ride", "rental", "invoice", "invoices", "checkout", "cart", "subscription", "wallet", "funds", "money", "transaction",
@@ -132,7 +138,7 @@ WEB_SEARCH_NOUNS = {"web", "engine", "internet", "online", "google", "bing", "du
 _VERB_FAMILY: dict[str, str] = {}
 for _vs, _fam in ((READ_VERBS, "data.read"), (COMPUTE_VERBS, "compute.pure"), (MAIL_VERBS, "mail.send"), (PAY_VERBS, "payments.transfer"),
                   (DELETE_VERBS, "data.delete"), (WRITE_VERBS, "data.write"), (EXEC_VERBS, "code.exec"), (CARRIER_VERBS, "carrier"),
-                  (AMBIGUOUS_ADD, "ambiguous")):
+                  (AMBIGUOUS_ADD, "ambiguous"), (WEAK_MAIL, "weak-mail")):
     for _v in _vs:
         _VERB_FAMILY.setdefault(_v, _fam)          # a verb listed in two sets keeps the FIRST (safer) family
 del _vs, _fam, _v
@@ -197,6 +203,11 @@ def heuristic_resolve(name: str, description: str = "") -> dict | None:
                 break
         if fam is not None:
             break
+    if fam == "weak-mail":
+        if tset & READ_VERBS: fam = "data.read"                                    # Abuse Contact Lookup: the read verb wins
+        elif tset & COMPUTE_NOUNS: return _res("compute.pure", "weak-mail+compute-noun")   # Toxic Comment Detector, Email Checker
+        elif tset & LOOKUP_NOUNS: return _res("data.read", "weak-mail+lookup-noun")
+        else: return _res("mail.send", "weak-mail-verb")                          # bare comment / contact / email_report: tier 2, conservative
     if fam == "data.read":
         if verb in {"is", "has", "check", "verify", "validate", "get", "count"} and tset & COMPUTE_NOUNS and not tset & LOOKUP_NOUNS:
             return _res("compute.pure", "read-verb+compute-noun")            # is_prime, get_area — but find/search/lookup stay lookups
@@ -214,7 +225,7 @@ def heuristic_resolve(name: str, description: str = "") -> dict | None:
         return _res(fam, "verb")
     # 5. carrier verb or no verb: the nouns decide — compute -> device -> exec -> payments -> write -> lookup
     if "test" in tset and tset & {"t", "chi", "hypothesis", "ttest", "squared", "sample"}: return _res("compute.pure", "noun:stat-test")
-    if tset & COMPUTE_NOUNS and not tset & (PAY_NOUNS | EXEC_NOUNS): return _res("compute.pure", "noun:compute")
+    if tset & COMPUTE_NOUNS and not tset & (PAY_NOUNS | EXEC_NOUNS - ({"code"} if "qr" in tset else set())): return _res("compute.pure", "noun:compute")
     if tset & DEVICE_NOUNS and tset & (DEVICE_VERBS | CARRIER_VERBS): return _res("device.actuate", "noun:device")
     if tset & EXEC_NOUNS: return _res("code.exec", "noun:exec")
     if tset & PAY_NOUNS: return _res("payments.transfer", "noun:payments")

@@ -93,3 +93,19 @@ def test_bucket_review_fixes():
     assert heuristic_resolve("duck_duck_go")["scope"] == "web.search" and heuristic_resolve("web_search")["scope"] == "web.search"
     assert heuristic_resolve("create_histogram")["scope"] == "compute.pure"
     assert heuristic_resolve("set_navigation")["scope"] == "device.actuate"
+
+
+def test_out_of_sample_generalizations_from_hermes_and_toolace():
+    """T11 out-of-sample review (hermes / ToolACE were not used to curate v1): agent-nouns are computation;
+    WEAK mail words (comment/email/contact) must not beat a read verb or an agent-noun; strong ones still do."""
+    for name in ("ExpertQAExtractor", "Toxic Comment Detector API", "Bouncer Email Checker", "QR Code Generator", "email_validator", "transcribe_audio"):
+        assert heuristic_resolve(name)["scope"] == "compute.pure", name
+    assert heuristic_resolve("Abuse Contact Lookup")["scope"] == "data.read"
+    assert heuristic_resolve("track_expenses")["scope"] == "data.write"
+    for name in ("post_social_media_status", "send_email", "email_report", "comment", "contact"):
+        assert heuristic_resolve(name)["scope"] == "mail.send", name                    # strong verbs / bare weak verbs stay tier 2
+    assert heuristic_resolve("execute_program")["scope"] == "code.exec"
+    for name in ("SEC Filings", "Timezones", "Airports in a Metro"):
+        assert heuristic_resolve(name)["scope"] == "data.read", name                    # verb-less plural lookup nouns
+    assert heuristic_resolve("United States Transit Stations Mobility API")["scope"] == "data.read"
+    assert heuristic_resolve("Commify") is None                                         # nonsense stays unresolved
