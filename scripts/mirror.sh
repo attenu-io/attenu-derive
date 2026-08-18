@@ -12,6 +12,7 @@ if [ "${1:-push}" = "pull" ]; then
 else
   # data/corpus = shippable rows (task text hashed); data/mirror = local-only rows (task text kept)
   # — BOTH stay private in this bucket; the bucket is single-tenant, private by default.
-  tigris cp -r ./data "t3://$BUCKET/"
+  # data/raw (public dataset downloads, re-fetchable via the normalizers' --download) is NOT mirrored.
+  for d in corpus mirror runs reports; do [ -d "./data/$d" ] && tigris cp -r "./data/$d" "t3://$BUCKET/data/"; done
 fi
 tigris ls "t3://$BUCKET/data" | head -20
