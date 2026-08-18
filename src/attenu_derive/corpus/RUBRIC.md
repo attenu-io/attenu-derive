@@ -8,6 +8,7 @@
 3. **Write loops are a liability, not just a cost:** orchestrator labels carry a **`CallLimit(5)` on `fs.write`** (a report task needs a handful of writes). Engineering note: the shim's `CallLimit` is not scope-specific today — adapters must meter only write calls into the `calls` context (or the vocabulary gains scoped quantity ceilings); tracked in the plan.
 4. **Role defaults over observed minima for read ceilings:** sub-agent researchers get `RowLimit(1000)` regardless of the run's observed maximum (over-fitting to the lowest observed bucket would raise the benign-deny rate as tasks vary); `EgressRank(none)` stays.
 5. **Rubric stance:** flag-but-admit is too loose for a defensible posture; prompt contradictions and framework failure modes become constraints. "Needed vs over-exploration" remains the mental model.
+6. **Truncated and degenerate rows (v1.1, 2026-08-18):** rows from runs cut short (timeout / cap / error → `truncated`) and rows where the agent did nothing it was asked to (sub-agent with zero calls; orchestrator that never wrote its requested deliverable → `degenerate`) carry no evidence about what the role NEEDS. They keep their labels and count for benign-deny (a proposal must still admit what they did do) but are **excluded from over-provisioning metrics** and reported as counts. Rationale: an empty envelope from a lazy or interrupted run is not proof that the template over-granted.
 
 ---
 

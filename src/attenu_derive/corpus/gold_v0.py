@@ -47,7 +47,13 @@ def label_row(r: dict, cat: dict) -> dict:
                ([{"type": "EgressRank", "level": "none"}] if "fs.read" in scopes and not scopes & {"web.fetch", "mail.send", "crm.export"} else [])
     if RUBRIC_VERSION >= 1 and root and "fs.write" in scopes:
         ceilings.append({"type": "CallLimit", "max": 5, "applies_to": "fs.write"})   # ruling 3 (adapter meters writes into `calls`)
+    # degenerate: a sub-agent that made no calls, or an orchestrator that never wrote the deliverable its task
+    # asked for — the run carries no evidence about what the role NEEDS (model laziness / early stop), so it
+    # must not count as over-provisioning evidence (it still counts for benign-deny).
+    asks_write = bool(re.search(r"\b(write|save)\b.*\.md\b|\b[A-Z_]+\.md\b", r.get("task") or ""))
+    degenerate = (not root and not r["child_calls"]) or (root and asks_write and writes == 0)
     return {"event_id": r["event_id"], "project": r["project"], "framework": r["framework"], "agent": r["agent"], "role": "orchestrator" if root else "subagent",
+            "degenerate": degenerate,
             "task": r.get("task", ""), "observed_envelope": env, "delegated_to": r.get("delegated_to", []),
             "label": {"scopes": sorted(scopes), "ceilings": ceilings, "ttl_bucket_s": 900},
             "negatives": sorted(set(negatives)), "over_exploration": over,
@@ -58,12 +64,26 @@ def label_row(r: dict, cat: dict) -> dict:
             "rubric_version": RUBRIC_VERSION}
 
 
+def _truncation_index() -> dict:
+    """(run_id, task_index) -> True when that task ended by error/timeout/budget (manifests)."""
+    idx = {}
+    for mf in glob.glob("data/runs/*/manifest.json"):
+        m = json.loads(Path(mf).read_text())
+        for r in m.get("results", []):
+            st = str(r.get("status", ""))
+            idx[(m["run_id"], r.get("task_index"))] = st.startswith("error") or bool(r.get("aborted"))
+    return idx
+
+
 def main(argv=None) -> int:
-    cat = load_catalog(); gold = []
+    cat = load_catalog(); gold = []; trunc = _truncation_index()
     for f in sorted(glob.glob("data/mirror/*.jsonl")):
+        run_id = Path(f).stem.split("-")[-2] + "-" + Path(f).stem.split("-")[-1]   # <project>-<tag>-<YYYYMMDDTHHMMSS>-<hex>
         for line in Path(f).read_text().splitlines():
             if line.strip():
-                gold.append(label_row(json.loads(line), cat))
+                r = json.loads(line); g = label_row(r, cat)
+                g["truncated"] = bool(trunc.get((run_id, r.get("run", {}).get("task_index")), False))
+                gold.append(g)
     GOLD.write_text("\n".join(json.dumps(g, sort_keys=True) for g in gold) + "\n")
     print("| # | project / fw | agent | task (truncated) | observed tools · quantities | label scopes | ceilings | over-exploration |")
     print("|---|---|---|---|---|---|---|---|")
@@ -73,7 +93,7 @@ def main(argv=None) -> int:
         env = g["observed_envelope"]; q = env["quantities_max"]
         ceils = "; ".join(f"{c['type']}({c.get('max', c.get('level'))})" for c in g["label"]["ceilings"]) or "—"
         print(f"| {i} | {g['project']} / {fw} | {g['agent']} | {task} | {', '.join(env['tools'])}{(' · q=' + json.dumps(q)) if q else ''} | {', '.join(g['label']['scopes'])} | {ceils} | {', '.join(g['over_exploration']) or '—'} |")
-    print(f"\ngold items: {len(gold)} -> {GOLD}", file=sys.stderr)
+    print(f"\ngold items: {len(gold)} (truncated runs: {sum(1 for g in gold if g.get('truncated'))}) -> {GOLD}", file=sys.stderr)
     return 0
 
 

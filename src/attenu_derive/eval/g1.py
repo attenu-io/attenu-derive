@@ -75,14 +75,15 @@ def score(rows: list[dict], deriver: Deriver, cat: dict) -> dict:
             used_scopes.add(f"agent.delegate.{child}")
         gscopes = set(granted.scopes)
         unused = {s for s in gscopes if not any(_covers(s, u) for u in used_scopes)}
-        unused_shares.append(len(unused) / len(gscopes) if gscopes else 0.0)
         gold_scopes = set(g["label"]["scopes"])
-        if any(not any(_covers(ls, s) for ls in gold_scopes) for s in gscopes):
-            over_prov += 1
+        if not g.get("truncated") and not g.get("degenerate"):   # cut-short or do-nothing runs under-represent need: never evidence of over-provisioning
+            unused_shares.append(len(unused) / len(gscopes) if gscopes else 0.0)
+            if any(not any(_covers(ls, s) for ls in gold_scopes) for s in gscopes):
+                over_prov += 1
         per_row.append({"event_id": g["event_id"], "project": g["project"], "agent": g["agent"], "layer": rec.layer,
                         "template": rec.template, "granted": sorted(gscopes), "gold": sorted(gold_scopes),
                         "denied_benign": denied_here, "unused": sorted(unused)})
-    return {"rows": n, "benign_uses": benign_total,
+    return {"rows": n, "rows_truncated": sum(1 for g in rows if g.get("truncated")), "rows_degenerate": sum(1 for g in rows if g.get("degenerate")), "benign_uses": benign_total,
             "benign_deny_rate": round(benign_denied / benign_total, 4) if benign_total else None,
             "unused_scope_share": round(sum(unused_shares) / len(unused_shares), 4) if unused_shares else None,
             "over_provision_rows": over_prov, "escalation_count": escalations, "layer_mix": dict(layers), "per_row": per_row}
