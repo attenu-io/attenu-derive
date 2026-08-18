@@ -1,6 +1,7 @@
 """Generic ADK-app runner (real-world workloads): tree walking, declared suites from the real tree, model override + Gemini-only tool stubbing."""
 import pytest
 pytest.importorskip("google.adk")
+pytest.importorskip("litellm")
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import google_search
