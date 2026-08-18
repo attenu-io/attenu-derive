@@ -58,6 +58,7 @@ class DelegationEvent:
     parent_authority: Authority | None       # None for a root with no parent (then no meet)
     declared_subagents: list[str] = field(default_factory=list)
     subagent_tools: dict[str, list[str]] = field(default_factory=dict)   # declared sub-agents' tool suites: the delegation subtree a parent must cover (rubric v1.2)
+    role_constraints: dict = field(default_factory=dict)                 # structural role signals not from task text (e.g. {"no_write": True}); {"allow_write": True} opts a child back in
 
 
 @dataclass
@@ -146,7 +147,7 @@ class Deriver:
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
         t0 = time.perf_counter()
-        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog, subagent_tools=ev.subagent_tools)
+        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog, subagent_tools=ev.subagent_tools, role_constraints=ev.role_constraints)
         if m is not None:
             spec = {"scopes": sorted(m.scopes), "ceilings": m.ceilings, "ttl": m.ttl}
             if m.held_for_delegation:
@@ -161,6 +162,13 @@ class Deriver:
                 unknown = [t for t in (ev.tools_available or []) if resolve(self.catalog, t) is None or str(resolve(self.catalog, t).get("scope", "")).startswith("unknown.")]
                 spec = {"scopes": [], "ceilings": [], "ttl": 300}
                 layer, tname, conf, evidence = "L4", None, 0.0, {"reason": "no template and no catalog-resolvable tools; fail closed", "unknown_tools": unknown}
+        # Structural read-only cap: a sub-agent DECLARED no_write (role_constraints, not task text) never holds write/egress/
+        # exec families, at any layer. This is the enforceable form of "a sub-agent's write authority is explicit, never inferred".
+        if (ev.role_constraints or {}).get("no_write"):
+            from attenu_derive.derive.templates import EXPLORER_FAMILIES
+            readside = set(EXPLORER_FAMILIES) | {"compute.pure", "state.write"} | {s for s in spec["scopes"] if s.startswith("agent.delegate")}
+            spec = dict(spec, scopes=[s for s in spec["scopes"] if s in readside],
+                        held_for_delegation=[s for s in spec.get("held_for_delegation", []) if s in readside])
         proposal = spec_to_authority(spec)
         granted = ev.parent_authority.meet(proposal) if ev.parent_authority is not None else proposal
         rec = DerivationRecord(layer, tname, spec, conf, evidence, round((time.perf_counter() - t0) * 1000, 3), granted.to_wire())
@@ -177,7 +185,7 @@ def event_from_row(row: dict, task_text: str | None = None) -> DelegationEvent:
     return DelegationEvent(task=task_text if task_text is not None else (row.get("task") or ""),
                            role="root" if row.get("parent_node") is None else "child", agent=agent,
                            tools_available=tools, parent_authority=parent, declared_subagents=declared,   # declared roster; no phantom sub-agent
-                           subagent_tools=sub_tools)
+                           subagent_tools=sub_tools, role_constraints=dict(row.get("role_constraints") or {}))
 
 
 def main(argv=None) -> int:

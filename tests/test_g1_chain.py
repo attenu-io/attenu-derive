@@ -104,10 +104,10 @@ def test_declared_subagents_come_from_the_roster_not_from_observed_spawns():
     root_row = next(r for r in s["per_row"] if r["agent"] == "orchestrator")
     assert "agent.delegate.security-reviewer" in root_row["unused"]                       # a declared-but-unused delegate is now VISIBLE as unused
     assert "agent.delegate.researcher" not in root_row["unused"]
-    g2 = dict(g, task=ROOT_TASK)                                                            # names "researcher" -> the other is not granted at all (derived from the task)
+    g2 = dict(g, task=ROOT_TASK)                                                            # delegate grant is the whole roster regardless of the task
     s2 = score([g2, _child()], Deriver(), load_catalog(), parent="chain")
     root_row2 = next(r for r in s2["per_row"] if r["agent"] == "orchestrator")
-    assert "agent.delegate.security-reviewer" not in root_row2["granted"] and "agent.delegate.researcher" in root_row2["granted"]
+    assert "agent.delegate.security-reviewer" in root_row2["granted"] and "agent.delegate.researcher" in root_row2["granted"]
 
 
 def test_truncation_is_per_node_when_lifecycle_is_known():

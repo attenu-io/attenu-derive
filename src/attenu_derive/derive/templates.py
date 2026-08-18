@@ -74,7 +74,7 @@ class TemplateMatch:
 
 
 def match(role: str, task: str, tools_available: list[str], declared_subagents: list[str], catalog: dict | None = None,
-          subagent_tools: dict[str, list[str]] | None = None) -> TemplateMatch | None:
+          subagent_tools: dict[str, list[str]] | None = None, role_constraints: dict | None = None) -> TemplateMatch | None:
     """Return the best-matching L1 template, or None (fall through to L2)."""
     task = task or ""
     fams = families_of(tools_available, catalog)
@@ -89,7 +89,11 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
     has_msg = any(str(e.get("scope", "")) == "agent.message" for e in fams.values())
 
     # EXPLORER: a sub-agent whose task is to look and report; may hold write tools but must not use them.
-    if role == "child" and not _NON_LOCAL.search(task) and (_EXPLORE.search(task) or (has_read and not _WRITE_OUT.search(task))) and not _WRITE_OUT.search(task):
+    # A reading sub-agent (has fs.read tools, no structural write grant) STAYS an explorer regardless of task-text
+    # write/egress verbs — otherwise injected text ("...send an email...") knocks it out of this narrow template into a
+    # wider L2 and grants fs.write from the Write tool it holds but must not use (T17). Task text may narrow, never widen.
+    structural_write = bool((role_constraints or {}).get("allow_write"))
+    if role == "child" and has_read and not structural_write:
         conf = 0.9 if _EXPLORE.search(task) else 0.7
         if read_heur: conf -= 0.2                                     # a read family reached only through a name heuristic
         return TemplateMatch("explorer", set(read_scopes),           # the read families ITS tools resolve to — {} when it holds no read tool
@@ -100,12 +104,12 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
 
     # DELEGATING-WRITER: a root that delegates exploration and writes one deliverable.
     if role == "root" and (_WRITE_OUT.search(task) or has_write) and (has_del or _DELEGATE.search(task) or declared_subagents):
-        # Which sub-agents? Derived from the TASK: if the text names members of the declared roster, only those; if it names
-        # none, the whole roster (the deriver cannot know). Names match with '-'/'_'/' ' treated alike (T21 follow-up).
+        # Delegate authority is the DECLARED roster — task-text-INDEPENDENT, so injected text cannot add or move a delegate
+        # scope (T17: task text must never widen; the delegation graph is bounded by meet, not by the prompt). Which members
+        # the task happens to name is recorded as evidence only, never as the grant.
         low = re.sub(r"[-_]", " ", task.lower())
         named = [s for s in (declared_subagents or []) if re.search(r"\b" + re.escape(re.sub(r"[-_]", " ", s.lower())) + r"\b", low)]
-        wanted = named or list(declared_subagents or [])
-        scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in wanted}   # the write family ITS tool resolves to — none without a write tool
+        scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in (declared_subagents or [])}   # the write family ITS tool resolves to — none without a write tool
         # Rubric v1.2 (T13, 2026-08-18): monotonic attenuation means child ⊆ parent — a parent cannot delegate what
         # it does not hold. The delegating-writer therefore HOLDS, for delegation, the read families its tools
         # resolve to (T12 semantics: never wider, tier<=1). Its OWN reads remain the over-exploration signal (R3),
