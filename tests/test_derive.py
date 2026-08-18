@@ -74,3 +74,15 @@ def test_latency_budget_l1_l2():
         for _ in range(200):
             t0 = time.perf_counter(); d.propose(ev); ts.append(time.perf_counter() - t0)
         ts.sort(); assert ts[int(0.95 * len(ts))] < cap
+
+
+def test_l2_heuristic_grants_low_risk_only_and_lowers_confidence():
+    d = Deriver()
+    wide = Authority({"data.*", "payments.*", "web.*"}, [], ttl=None)     # parent holds both families
+    ev = _ev(task="Check the weather and book the flight", role="child", agent="bot",
+             tools_available=["get_weather_forecast", "book_flight"], parent_authority=wide)
+    auth, rec = d.propose(ev)
+    assert rec.layer == "L2" and rec.confidence < 0.6
+    assert auth.covers_scope("data.read")                        # tier-0 heuristic family: granted (low confidence)
+    assert not auth.covers_scope("payments.transfer")            # tier-2 via heuristic: withheld (fail closed)
+    assert ("book_flight", "payments.transfer") in rec.evidence["withheld_heuristic"]

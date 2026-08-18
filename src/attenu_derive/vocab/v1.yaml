@@ -17,6 +17,10 @@ scopes:
   - db.write
   - payments.transfer
   - agent.delegate.*
+  - data.read          # generic API/data families (heuristic tier + datasets)
+  - data.write
+  - data.delete
+  - compute.pure       # pure computation, no resource
   - agent.message
   - state.write        # internal scratch state (todos), not a resource
 ceilings:            # existing delegation-guard types only

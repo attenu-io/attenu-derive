@@ -74,12 +74,19 @@ class Deriver:
         self.catalog = catalog or load_catalog()
 
     # ---- L2 -----------------------------------------------------------------------------
+    HEURISTIC_MAX_TIER = 1      # heuristic (uncurated) classifications may grant tier 0-1 families only;
+                                # tier-2 families (payments, mail.send, code.exec, deletes) need a curated entry
+
     def _l2(self, ev: DelegationEvent) -> tuple[dict, dict] | None:
-        scopes: set[str] = set(); ceilings: list[dict] = []; unknown = []; consumed = set()
+        scopes: set[str] = set(); ceilings: list[dict] = []; unknown = []; consumed = set(); heuristic_used = []; withheld = []
         for t in ev.tools_available or []:
             e = resolve(self.catalog, t)
             if e is None or str(e.get("scope", "")).startswith("unknown."):
                 unknown.append(t); continue
+            if e.get("heuristic"):
+                if int(e.get("tier", 2)) > self.HEURISTIC_MAX_TIER:
+                    withheld.append((t, e["scope"])); continue           # fail closed: too risky to grant on a name heuristic
+                heuristic_used.append((t, e["scope"]))
             sc = e["scope"]
             if sc == "agent.delegate":
                 scopes |= {f"agent.delegate.{s}" for s in ev.declared_subagents}
@@ -97,7 +104,8 @@ class Deriver:
             ceilings.append({"type": "CallLimit", "max": 5, "applies_to": "fs.write"})
         egress_needed = any(s in scopes for s in ("web.fetch", "web.search", "mail.send", "crm.export"))
         ceilings.append({"type": "EgressRank", "level": "internal" if egress_needed else "none"})
-        return {"scopes": sorted(scopes), "ceilings": ceilings, "ttl": 900}, {"unknown_tools": unknown, "consumed": sorted(consumed)}
+        return ({"scopes": sorted(scopes), "ceilings": ceilings, "ttl": 900},
+                {"unknown_tools": unknown, "consumed": sorted(consumed), "heuristic_grants": heuristic_used, "withheld_heuristic": withheld})
 
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
@@ -109,7 +117,8 @@ class Deriver:
         else:
             l2 = self._l2(ev)
             if l2 is not None:
-                spec, evidence = l2; layer, tname, conf = "L2", None, 0.6
+                spec, evidence = l2; layer, tname = "L2", None
+                conf = 0.4 if evidence.get("heuristic_grants") else 0.6     # uncurated mapping -> lower confidence
             else:
                 unknown = [t for t in (ev.tools_available or []) if resolve(self.catalog, t) is None or str(resolve(self.catalog, t).get("scope", "")).startswith("unknown.")]
                 spec = {"scopes": [], "ceilings": [], "ttl": 300}
