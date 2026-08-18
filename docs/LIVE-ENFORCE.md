@@ -31,9 +31,10 @@ The operator installs the app with the `retail-support` pack and grants its ever
 - **No model divergence:** Haiku and Sonnet behave identically across all runs — the model-monoculture
   residual is retired for this app; enforcement does not depend on model class.
 
-**Bounds (honest):** one app, one framework (ADK), single-agent (no live delegation chain). The offline
-enforce proof (`eval/enforce`, 21 projects incl. a multi-agent app) covers the chain; a live multi-agent
-enforce run is the natural next extension.
+**Bounds (honest):** the runs in THIS section are single-agent; the delegation-chain section below adds a
+live multi-agent enforce run on the same app (financial-advisor), so "no live delegation chain" is no longer
+a bound. Remaining bounds: one framework (ADK), and no live *payment* denial (the deriver holding
+`process_payment` until granted is pinned offline in `tests/test_onboarding.py`).
 
 
 ## Live enforce ACROSS A DELEGATION CHAIN — financial-advisor (T34, Haiku)
