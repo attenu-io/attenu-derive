@@ -127,68 +127,28 @@ def make_plugin(salt: str):
     return root, plugin
 
 
-# ---- repository tools (read-only over the checkout; writes go to the run's artifacts dir) -----------------------
-_MAX_LIST = 80; _MAX_LINES = 120; _MAX_MATCHES = 40; _MAX_FILE_BYTES = 400_000     # trimmed after fd run: 300k tokens in ~30 LLM calls (Gemini re-sends every tool result each step)
-_SKIP_DIRS = {".git", "node_modules", "target", "dist", "build", "__pycache__", ".venv", "vendor"}
-
-
+# ---- repository tools: the SHARED read-only surface (attenu_derive.sample.repo_tools), wrapped as ADK callables ----------
 def make_tools(repo: Path, artifacts: Path):
-    repo = repo.resolve(); artifacts.mkdir(parents=True, exist_ok=True)
-
-    def _inside(p: str) -> Path:
-        q = (repo / p).resolve()
-        if repo not in q.parents and q != repo:
-            raise ValueError("path escapes the repository")
-        return q
-
-    def _skip(p: Path) -> bool:
-        return any(part in _SKIP_DIRS for part in p.relative_to(repo).parts)
+    from attenu_derive.sample.repo_tools import RepoTools
+    rt = RepoTools(repo, artifacts)
 
     def list_files(pattern: str = "**/*") -> dict:
         """List files in the repository matching a glob pattern (relative to the repo root), e.g. "src/**/*.rs" or "*.md"."""
-        out = []
-        for p in sorted(repo.glob(pattern)):
-            if p.is_file() and not _skip(p):
-                out.append(str(p.relative_to(repo)))
-                if len(out) >= _MAX_LIST:
-                    break
-        return {"files": out, "truncated": len(out) >= _MAX_LIST}
+        return rt.list_files(pattern)
 
-    def read_file(path: str, offset: int = 0, limit: int = 200) -> dict:
+    def read_file(path: str, offset: int = 0, limit: int = 120) -> dict:
         """Read up to `limit` lines of a repository file starting at line `offset` (0-based)."""
-        q = _inside(path)
-        if not q.is_file():
-            return {"error": "not a file"}
-        if q.stat().st_size > _MAX_FILE_BYTES:
-            return {"error": "file too large; use search_files"}
-        lines = q.read_text(errors="replace").splitlines()
-        lim = max(1, min(int(limit or _MAX_LINES), _MAX_LINES)); off = max(0, int(offset or 0))
-        return {"path": path, "offset": off, "lines": lines[off: off + lim], "total_lines": len(lines)}
+        return rt.read_file(path, offset, limit)
 
     def search_files(pattern: str, glob: str = "**/*") -> dict:
-        """Search the repository for a regular expression; returns up to 100 matches as {path, line, text}."""
-        rx = re.compile(pattern); hits = []
-        for p in sorted(repo.glob(glob)):
-            if not p.is_file() or _skip(p) or p.stat().st_size > _MAX_FILE_BYTES:
-                continue
-            try:
-                for i, line in enumerate(p.read_text(errors="replace").splitlines(), 1):
-                    if rx.search(line):
-                        hits.append({"path": str(p.relative_to(repo)), "line": i, "text": line.strip()[:200]})
-                        if len(hits) >= _MAX_MATCHES:
-                            return {"matches": hits, "truncated": True}
-            except (OSError, UnicodeDecodeError):
-                continue
-        return {"matches": hits, "truncated": False}
+        """Search the repository for a regular expression; returns up to 40 matches as {path, line, text}."""
+        return rt.search_files(pattern, glob)
 
     def write_file(path: str, content: str) -> dict:
         """Write the final deliverable file (e.g. REPORT.md). Only the orchestrator writes; one file per task."""
-        name = Path(path).name or "OUTPUT.md"
-        (artifacts / name).write_text(content)
-        return {"written": name, "bytes": len(content.encode())}
+        return rt.write_file(path, content)
 
     return list_files, read_file, search_files, write_file
-
 
 def build_tree(*, model: str, repo: Path, artifacts: Path):
     from google.adk.agents.llm_agent import LlmAgent
