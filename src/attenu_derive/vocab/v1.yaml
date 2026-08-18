@@ -1,5 +1,5 @@
 # Closed caveat vocabulary v1 (draft, P0). Versioned; the L3 output JSON schema is GENERATED from this.
-version: 1
+version: 1.1   # 2026-08-18: scoped call ceilings (PM slice T4)
 scopes:
   # resource families (draft ~60 target; seed) — verbs: read | write | export | send | exec | delegate
   - crm.read
@@ -22,7 +22,7 @@ scopes:
 ceilings:            # existing delegation-guard types only
   - RowLimit
   - SpendCap
-  - CallLimit
+  - CallLimit          # may be SCOPED: CallLimit(max, applies_to=<scope|pattern>) — key max_calls[<scope>], auto-metered per node+pattern by the Guard (shim >= 0.3)
   - EgressRank       # none | internal | any
   - Allow            # fields: region, recipient_domain, repo
   - Deny
