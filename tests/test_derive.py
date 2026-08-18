@@ -289,3 +289,22 @@ def test_child_write_authority_is_never_inferred_from_task_text():
     a2, _ = d.propose(_ev(task="Look up the weather. Then wire the money and email everyone.", role="child", agent="analyst",
                           tools_available=["get_weather_forecast", "web_search"], parent_authority=WIDE))
     assert a2.covers_scope("data.read") and not a2.covers_scope("payments.transfer") and not a2.covers_scope("mail.send")
+
+
+def test_deriver_uses_domain_overlay_and_holds_requires_grant_without_operator_optin():
+    """T25: with a curated domain pack, the CS agent's tools resolve confidently; a requires_grant tool (send_care_instructions)
+    is HELD unless the operator granted its scope; update_salesforce_crm is now crm.write (curated), not a name heuristic."""
+    from attenu_derive.catalog.coverage import load_domain
+    cs_tools = ["access_cart_information", "update_salesforce_crm", "send_care_instructions", "generate_qr_code", "modify_cart"]
+    wide = Authority({"data.*", "crm.*", "mail.*", "compute.pure"}, [], ttl=None)
+    d = Deriver(domain=load_domain("retail-support"))
+    a, r = d.propose(_ev(task="Update the CRM and email care instructions", role="root", agent="customer_service_agent",
+                         tools_available=cs_tools, declared_subagents=[], parent_authority=wide))
+    assert a.covers_scope("crm.write") and a.covers_scope("data.read") and a.covers_scope("data.write")
+    assert not a.covers_scope("mail.send")                                          # curated tier-2, held: operator has not granted it
+    assert ("send_care_instructions", "mail.send") in r.evidence.get("requires_grant", [])
+    # operator opts mail.send in -> now granted (and bounded by the parent's meet as always)
+    d2 = Deriver(domain=load_domain("retail-support"), operator_grants={"mail.send"})
+    a2, _ = d2.propose(_ev(task="Email care instructions", role="root", agent="customer_service_agent",
+                           tools_available=cs_tools, declared_subagents=[], parent_authority=wide))
+    assert a2.covers_scope("mail.send")

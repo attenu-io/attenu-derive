@@ -52,3 +52,31 @@ def test_adk_builtin_tools_are_curated():
     assert resolve(cat, "google_search")["scope"] == "web.search" and not resolve(cat, "google_search").get("heuristic")
     assert resolve(cat, "transfer_to_agent")["scope"] == "agent.delegate"
     assert resolve(cat, "load_web_page")["scope"] == "web.fetch"
+
+
+# ---- T25: domain catalog overlays + operator-grant marking (the "held pending curation" requirement made concrete) ----
+def test_domain_overlay_curates_app_tools_and_marks_operator_grant():
+    from attenu_derive.catalog.coverage import load_domain, resolve, coverage
+    base = load_catalog()
+    ov = load_domain("retail-support")
+    # base: heuristic (or wrong); overlay: curated, correct
+    assert resolve(base, "update_salesforce_crm").get("heuristic")                      # base: CRM write off "update"
+    assert resolve(base, "update_salesforce_crm", overlay=ov)["scope"] == "crm.write" and not resolve(base, "update_salesforce_crm", overlay=ov).get("heuristic")
+    assert resolve(base, "access_cart_information", overlay=ov)["scope"] == "data.read"
+    assert resolve(base, "modify_cart", overlay=ov)["scope"] == "data.write"            # a cart write, NOT payments
+    assert resolve(base, "generate_qr_code", overlay=ov)["scope"] == "compute.pure"
+    # the tier-2 send_* are curated AND marked requires_grant (known, named, one flip from enabled — not silently granted)
+    e = resolve(base, "send_care_instructions", overlay=ov)
+    assert e["scope"] == "mail.send" and e.get("requires_grant") is True and not e.get("heuristic")
+
+
+def test_coverage_reports_curated_share_per_domain():
+    from attenu_derive.catalog.coverage import load_catalog, load_domain, coverage
+    cat = load_catalog(); ov = load_domain("retail-support")
+    rows = [{"child_calls": [{"tool": "access_cart_information"}, {"tool": "update_salesforce_crm"},
+                             {"tool": "send_care_instructions"}, {"tool": "generate_qr_code"}]}]
+    base = coverage(rows, cat)
+    withov = coverage(rows, cat, overlay=ov)
+    assert base["calls_curated_share"] == 0.0                                            # nothing curated in the base
+    assert withov["calls_curated_share"] >= 0.9                                          # >= 90% curated with the pack
+    assert withov["calls_requires_grant_share"] == 0.25                                  # the one send_* is curated-but-held

@@ -40,12 +40,14 @@ def _default_catalog() -> dict:
     return load_catalog()
 
 
-def families_of(tools_available: list[str], catalog: dict | None = None) -> dict[str, dict]:
-    """tool -> catalog entry (curated or heuristic) for every resolvable tool; unknown.* and unresolved are dropped."""
+def families_of(tools_available: list[str], catalog: dict | None = None, overlay: dict | None = None) -> dict[str, dict]:
+    """tool -> catalog entry (curated or heuristic) for every resolvable tool; unknown.*, unresolved and requires_grant (held) dropped."""
     from attenu_derive.catalog.coverage import resolve
     cat = catalog if catalog is not None else _default_catalog(); out = {}
     for t in tools_available or []:
-        e = resolve(cat, t)
+        e = resolve(cat, t, overlay=overlay)
+        if e is not None and e.get("requires_grant"):
+            continue                                     # held pending operator grant: not an auto-granted family at L1
         if e is not None and not str(e.get("scope", "")).startswith("unknown."):
             out[t] = e
     return out
@@ -74,13 +76,13 @@ class TemplateMatch:
 
 
 def match(role: str, task: str, tools_available: list[str], declared_subagents: list[str], catalog: dict | None = None,
-          subagent_tools: dict[str, list[str]] | None = None, role_constraints: dict | None = None) -> TemplateMatch | None:
+          subagent_tools: dict[str, list[str]] | None = None, role_constraints: dict | None = None, overlay: dict | None = None) -> TemplateMatch | None:
     """Return the best-matching L1 template, or None (fall through to L2)."""
     task = task or ""
-    fams = families_of(tools_available, catalog)
+    fams = families_of(tools_available, catalog, overlay)
     # the delegation SUBTREE's tools: what the declared sub-agents hold (role-specific suites: ADK/CrewAI orchestrators
     # hold no read tool themselves, their explorers do). A parent must hold what it delegates — from the subtree, never wider.
-    sub_fams = families_of(sorted({t for ts in (subagent_tools or {}).values() for t in ts}), catalog)
+    sub_fams = families_of(sorted({t for ts in (subagent_tools or {}).values() for t in ts}), catalog, overlay)
     subtree_read_scopes, subtree_read_heur = _scopes_in({**sub_fams, **fams}, EXPLORER_FAMILIES)
     read_scopes, read_heur = _scopes_in(fams, EXPLORER_FAMILIES)
     write_scopes, write_heur = _scopes_in(fams, WRITER_FAMILIES)

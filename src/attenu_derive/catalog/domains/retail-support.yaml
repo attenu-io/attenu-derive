@@ -1,0 +1,21 @@
+# Domain catalog pack — retail / customer-support (T25). Curated tool→scope entries for a real support agent
+# (validated on google/adk-samples customer-service). A domain pack is what ONBOARDING produces: it overlays the
+# shipped base catalog so a customer's own tool names resolve to a confident, curated grant instead of a name
+# heuristic. `requires_grant: true` marks a tier-2 tool that is curated (known, named) but HELD pending an explicit
+# operator grant — the "held pending curation" state, distinct from "denied" and from "auto-granted".
+domain: retail-support
+version: 1
+tools:
+  access_cart_information:    {scope: data.read,  consumes: {}, tier: 0}
+  get_product_recommendations: {scope: data.read, consumes: {}, tier: 0}
+  check_product_availability: {scope: data.read,  consumes: {}, tier: 0}
+  get_available_planting_times: {scope: data.read, consumes: {}, tier: 0}
+  generate_qr_code:           {scope: compute.pure, consumes: {}, tier: 0}
+  modify_cart:                {scope: data.write, consumes: {}, tier: 1}   # a cart write, NOT a payment (checkout is)
+  schedule_planting_service:  {scope: data.write, consumes: {}, tier: 1}
+  approve_discount:           {scope: data.write, consumes: {}, tier: 1}   # applies a discount; money-relevant, so:
+  sync_ask_for_approval:      {scope: agent.message, consumes: {}, tier: 1}  # escalates to a human manager
+  update_salesforce_crm:      {scope: crm.write,  consumes: {}, tier: 1}
+  # tier-2 egress — curated but HELD pending an explicit operator grant (not silently granted):
+  send_care_instructions:     {scope: mail.send,  consumes: {to: egress}, tier: 2, requires_grant: true}
+  send_call_companion_link:   {scope: mail.send,  consumes: {to: egress}, tier: 2, requires_grant: true}

@@ -1,0 +1,7 @@
+# Domain catalog pack — financial advisory (T25). Validated on google/adk-samples financial-advisor.
+# The analysts are read-only (search + retrieval); the coordinator delegates. No tier-2 auto-grants.
+domain: finance-advisory
+version: 1
+tools:
+  google_search:  {scope: web.search, consumes: {}, tier: 1}
+  load_web_page:  {scope: web.fetch,  consumes: {url: egress}, tier: 1}

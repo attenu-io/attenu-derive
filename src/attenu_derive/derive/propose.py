@@ -91,19 +91,23 @@ def spec_to_authority(spec: dict) -> Authority:
 
 
 class Deriver:
-    def __init__(self, catalog: dict | None = None):
+    def __init__(self, catalog: dict | None = None, domain: dict | None = None, operator_grants: set | None = None):
         self.catalog = catalog or load_catalog()
+        self.domain = domain                              # a curated domain pack (per-app onboarding overlay), or None
+        self.operator_grants = set(operator_grants or ())  # scopes the operator explicitly enabled for a requires_grant tool
 
     # ---- L2 -----------------------------------------------------------------------------
     from attenu_derive.catalog.heuristics import HEURISTIC_MAX_GRANT_TIER as HEURISTIC_MAX_TIER   # heuristic (uncurated) classifications may grant tier 0-1
                                 # families only; tier-2 (payments, mail.send, code.exec, deletes) need a curated entry — one constant, shared with coverage
 
     def _l2(self, ev: DelegationEvent) -> tuple[dict, dict] | None:
-        scopes: set[str] = set(); ceilings: list[dict] = []; unknown = []; consumed = set(); heuristic_used = []; withheld = []
+        scopes: set[str] = set(); ceilings: list[dict] = []; unknown = []; consumed = set(); heuristic_used = []; withheld = []; requires_grant = []
         for t in ev.tools_available or []:
-            e = resolve(self.catalog, t)
+            e = resolve(self.catalog, t, overlay=self.domain)
             if e is None or str(e.get("scope", "")).startswith("unknown."):
                 unknown.append(t); continue
+            if e.get("requires_grant") and e["scope"] not in self.operator_grants:
+                requires_grant.append((t, e["scope"])); continue        # curated tier-2 HELD pending an operator grant (known, named, one flip from enabled)
             if e.get("heuristic"):
                 if int(e.get("tier", 2)) > self.HEURISTIC_MAX_TIER:
                     withheld.append((t, e["scope"])); continue           # fail closed: too risky to grant on a name heuristic
@@ -125,7 +129,7 @@ class Deriver:
             scopes.add(f"agent.delegate.{child}")
         for child, ctools in (ev.subagent_tools or {}).items():
             for t in ctools or []:
-                ce = resolve(self.catalog, t)
+                ce = resolve(self.catalog, t, overlay=self.domain)
                 if ce is None or str(ce.get("scope", "")).startswith("unknown."): continue
                 csc = str(ce["scope"])
                 if csc in ("agent.delegate", "state.write") or int(ce.get("tier", 2)) > 1: continue
@@ -142,12 +146,12 @@ class Deriver:
         spec = {"scopes": sorted(scopes), "ceilings": ceilings, "ttl": 900}
         if held: spec["held_for_delegation"] = sorted(held)
         return (spec, {"unknown_tools": unknown, "consumed": sorted(consumed), "heuristic_grants": heuristic_used, "withheld_heuristic": withheld,
-                       "held_for_delegation": sorted(held)})
+                       "held_for_delegation": sorted(held), "requires_grant": requires_grant})
 
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
         t0 = time.perf_counter()
-        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog, subagent_tools=ev.subagent_tools, role_constraints=ev.role_constraints)
+        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog, subagent_tools=ev.subagent_tools, role_constraints=ev.role_constraints, overlay=self.domain)
         if m is not None:
             spec = {"scopes": sorted(m.scopes), "ceilings": m.ceilings, "ttl": m.ttl}
             if m.held_for_delegation:
