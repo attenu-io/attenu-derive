@@ -26,3 +26,5 @@ jobs:
             pip install -q -e . --no-deps
           fi
       - run: python -m pytest -q
+      - name: G1 eval card (committed gold, express held out) — fails on regression vs eval/thresholds.json
+        run: python -m attenu_derive.eval.g1 --holdout express --check --out reports

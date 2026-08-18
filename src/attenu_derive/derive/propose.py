@@ -26,7 +26,7 @@ __all__ = ["DelegationEvent", "DerivationRecord", "Deriver", "spec_to_authority"
 # tools_available per framework, when the corpus row does not carry it (harness configs; recorded in manifests going forward)
 FRAMEWORK_TOOLS = {
     "langchain/deepagents": ["ls", "glob", "grep", "read_file", "write_file", "edit_file", "write_todos", "task"],
-    "claude-agent-sdk": ["Read", "Grep", "Glob", "Write", "Agent"],
+    "claude-agent-sdk": ["Read", "Grep", "Glob", "Write", "Agent", "SendMessage"],   # SendMessage is a built-in the CLI always exposes
 }
 
 

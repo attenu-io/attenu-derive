@@ -23,6 +23,7 @@ _NON_LOCAL = re.compile(r"\b(fetch|download|website|web ?site|url|https?://|api 
 READ_TOOLS = {"ls", "glob", "grep", "read_file", "Read", "Glob", "Grep", "LS"}
 WRITE_TOOLS = {"write_file", "edit_file", "Write", "Edit", "NotebookEdit"}
 DELEGATE_TOOLS = {"task", "Agent", "Task"}
+MESSAGE_TOOLS = {"SendMessage"}
 
 
 @dataclass
@@ -50,13 +51,13 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
 
     # DELEGATING-WRITER: a root that delegates exploration and writes one deliverable.
     if role == "root" and (_WRITE_OUT.search(task) or has_write) and (has_del or _DELEGATE.search(task) or declared_subagents):
-        scopes = {"fs.write", "agent.message"} | {f"agent.delegate.{s}" for s in (declared_subagents or [])}
+        scopes = {"fs.write"} | {f"agent.delegate.{s}" for s in (declared_subagents or [])}
+        if tools & MESSAGE_TOOLS:                       # messaging is structural to orchestration — but only if the tool exists
+            scopes.add("agent.message")
+        # Rubric v1: the delegating-writer role is delegate + write. Reads belong to the sub-agents it
+        # delegates to; granting fs.read here was pure over-provision on every sampled project.
         reads_forbidden = bool(_DELEGATE_ALL_READING.search(task))
-        if has_read and not reads_forbidden:
-            scopes.add("fs.read")
         ceilings = [{"type": "CallLimit", "max": 5, "applies_to": "fs.write"}, {"type": "EgressRank", "level": "none"}]
-        if "fs.read" in scopes:
-            ceilings.append({"type": "RowLimit", "max": 1000})
         return TemplateMatch("delegating-writer", scopes, ceilings, 3600, 0.85,
                              {"signals": ["root-role", "write-deliverable", "delegates"] + (["delegate-all-reading"] if reads_forbidden else [])})
     return None

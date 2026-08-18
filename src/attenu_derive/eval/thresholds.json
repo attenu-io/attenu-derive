@@ -1,0 +1,2 @@
+{"_comment": "G1 gate on the HOLD-OUT project (Gate G1: benign-deny <= 2%, unused-scope <= 20%; escalation must be 0). Frozen 2026-08-18 after the single tuning pass; change only via the decision log.",
+ "benign_deny_rate_max": 0.02, "unused_scope_share_max": 0.20}
