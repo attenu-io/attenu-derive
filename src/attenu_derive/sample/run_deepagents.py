@@ -105,7 +105,7 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="claude-haiku-4-5-20251001")
     ap.add_argument("--tasks", default=None, help="file with one task per line (default: built-in 5)")
     ap.add_argument("--limit", type=int, default=None, help="only run the first N tasks")
-    ap.add_argument("--recursion-limit", type=int, default=80)
+    ap.add_argument("--recursion-limit", type=int, default=150)
     ap.add_argument("--max-tokens", type=int, default=2048)
     args = ap.parse_args(argv)
 
@@ -133,12 +133,20 @@ def main(argv=None) -> int:
     for i, task in enumerate(tasks):
         root, guarded = make_guarded(salt)
         agent = build_agent(model=model, repo=repo, guarded=guarded)
-        t0 = time.time(); status = "ok"; usage = {}
+        t0 = time.time(); status = "ok"
+        # Usage via callback, so it is captured even when the run ends in an exception
+        # (e.g. GraphRecursionError) — the audit log is complete either way.
+        from langchain_core.callbacks import UsageMetadataCallbackHandler
+        cb = UsageMetadataCallbackHandler()
         try:
-            result = agent.invoke({"messages": [("user", task)]}, config={"recursion_limit": args.recursion_limit})
-            usage = usage_of(result)
+            agent.invoke({"messages": [("user", task)]},
+                         config={"recursion_limit": args.recursion_limit, "callbacks": [cb]})
         except Exception as exc:  # keep sampling; record the failure
-            status = f"error: {type(exc).__name__}: {str(exc)[:200]}"
+            status = f"error: {type(exc).__name__}: {str(exc)[:120]}"
+        usage = {"input_tokens": 0, "output_tokens": 0}
+        for m in (cb.usage_metadata or {}).values():
+            usage["input_tokens"] += int(m.get("input_tokens", 0) or 0)
+            usage["output_tokens"] += int(m.get("output_tokens", 0) or 0)
         entries = root.audit_log().entries
         (out / "runs" / run_id / f"task{i}-audit.jsonl").write_text(
             "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
