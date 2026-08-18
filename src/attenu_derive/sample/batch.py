@@ -56,6 +56,8 @@ def main(argv=None) -> int:
             print(f"[batch] target reached: {events_now} real events"); break
         if spent + min(args.per_repo_max_usd, 1.0) > args.max_usd:
             print(f"[batch] ceiling: spent {spent:.2f} of {args.max_usd}"); break
+        if glob.glob(str(out / "corpus" / f"{repo.split('/')[-1]}-deepagents-*.jsonl")):
+            print(f"[batch] skip (already sampled with deepagents): {repo}"); continue         # resumable: rerunning never double-samples
         path = clone(repo, work)
         if path is None:
             print(f"[batch] clone failed: {repo}"); continue
