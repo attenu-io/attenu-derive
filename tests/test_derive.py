@@ -112,3 +112,59 @@ def test_curated_tier2_entry_is_granted_bounded_by_parent():
               parent_authority=Authority({"data.read"}, [], ttl=None))              # parent lacks it -> meet removes it
     auth2, rec2 = d.propose(ev2)
     assert not auth2.covers_scope("payments.transfer")
+
+
+# ---- T12 (PM W2→P2 slice, 2026-08-18): L1 templates COMPUTE their scopes from tools_available -----------------
+WIDE = Authority({"fs.*", "data.*", "agent.delegate.*", "agent.message", "web.*", "code.exec", "compute.pure"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)
+
+
+def test_explorer_grants_the_read_families_its_tools_resolve_to_never_wider():
+    """Site 1 (`templates.py` explorer): `{"fs.read"}` was hard-coded. An ADK explorer holding
+    list_files/read_file/search_text (search_text -> data.read) was benign-denied on every search
+    (G1 train benign-deny 0.0204). Scopes = read families of tools_available, intersected with the
+    template's allowed families — data.read only when a tool resolves to it."""
+    d = Deriver()
+    ev = _ev(task="Explore the repository and report findings with file paths", role="child", agent="researcher",
+             tools_available=["list_files", "read_file", "search_text"], parent_authority=WIDE)
+    auth, rec = d.propose(ev)
+    assert rec.layer == "L1" and rec.template == "explorer"
+    assert auth.covers_scope("fs.read") and auth.covers_scope("data.read")
+    assert auth.permits("data.read", {"rows": 10}) and auth.permits("fs.read", {"rows": 10})
+    assert not auth.covers_scope("fs.write") and not auth.covers_scope("data.write")
+    # never wider: a Claude-SDK explorer (Read/Grep/Glob) still gets fs.read ONLY
+    ev2 = _ev(task="Explore the repository and report findings", role="child", agent="researcher",
+              tools_available=["Read", "Grep", "Glob", "Write", "Agent", "SendMessage"], parent_authority=WIDE)
+    auth2, rec2 = d.propose(ev2)
+    assert rec2.template == "explorer" and auth2.scopes == {"fs.read"}
+
+
+def test_explorer_with_no_read_tool_gets_neither_read_scope_and_no_write():
+    d = Deriver()
+    ev = _ev(task="Explore the repository and report findings", role="child", agent="researcher",
+             tools_available=["Write"], parent_authority=WIDE)
+    auth, rec = d.propose(ev)
+    assert not auth.covers_scope("fs.read") and not auth.covers_scope("data.read") and not auth.covers_scope("fs.write")
+
+
+def test_delegating_writer_grants_the_write_family_its_tool_resolves_to():
+    """Site 2: `{"fs.write"}` was hard-coded. An orchestrator whose deliverable tool resolves to
+    data.write (e.g. `save_document`) must get data.write, not fs.write; no write tool -> no write scope."""
+    d = Deriver()
+    base = dict(task="Produce a short architecture overview and save it to REPORT.md. Delegate the reading to the researcher.",
+                role="root", agent="orchestrator", declared_subagents=["researcher"], parent_authority=WIDE)
+    a1, r1 = d.propose(_ev(**base, tools_available=["task", "write_file"]))
+    assert r1.template == "delegating-writer" and a1.covers_scope("fs.write") and not a1.covers_scope("data.write")
+    a2, r2 = d.propose(_ev(**base, tools_available=["task", "save_document"]))
+    assert r2.template == "delegating-writer" and a2.covers_scope("data.write") and not a2.covers_scope("fs.write")
+    assert a2.covers_scope("agent.delegate.researcher")
+    a3, r3 = d.propose(_ev(**base, tools_available=["task"]))
+    assert r3.template == "delegating-writer" and not a3.covers_scope("fs.write") and not a3.covers_scope("data.write")
+    assert a3.covers_scope("agent.delegate.researcher")
+
+
+def test_l1_never_grants_tier2_even_when_a_tool_resolves_there():
+    d = Deriver()
+    ev = _ev(task="Explore the repository and report findings", role="child", agent="researcher",
+             tools_available=["read_file", "delete_message", "Bash"], parent_authority=WIDE)
+    auth, rec = d.propose(ev)
+    assert rec.template == "explorer" and auth.scopes == {"fs.read"}

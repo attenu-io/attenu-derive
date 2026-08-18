@@ -110,7 +110,7 @@ class Deriver:
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
         t0 = time.perf_counter()
-        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents)
+        m = templates.match(ev.role, ev.task, ev.tools_available, ev.declared_subagents, catalog=self.catalog)
         if m is not None:
             spec = {"scopes": sorted(m.scopes), "ceilings": m.ceilings, "ttl": m.ttl}
             layer, tname, conf, evidence = "L1", m.name, m.confidence, m.evidence
@@ -132,7 +132,7 @@ class Deriver:
 def event_from_row(row: dict, task_text: str | None = None) -> DelegationEvent:
     fw = row.get("framework", "")
     tools = FRAMEWORK_TOOLS.get(fw, sorted({c["tool"] for c in row.get("child_calls", [])}))
-    parent = Authority({"fs.*", "agent.delegate.*", "agent.message", "web.*", "code.exec"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)  # observe-mode root
+    parent = Authority({"fs.*", "data.*", "compute.pure", "device.actuate", "agent.delegate.*", "agent.message", "web.*", "code.exec"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)  # observe-mode root
     return DelegationEvent(task=task_text if task_text is not None else (row.get("task") or ""),
                            role="root" if row.get("parent_node") is None else "child", agent=row.get("agent", ""),
                            tools_available=tools, parent_authority=parent, declared_subagents=list(row.get("delegated_to") or ["researcher"]))
