@@ -206,6 +206,8 @@ def main(argv=None) -> int:
             if r["parent_node"] is None:
                 r["task"] = task
         corpus_rows += rows; mirror_rows += mrows
+        (out / "corpus" / f"{project}-deepagents-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in corpus_rows) + "\n")   # incremental
+        (out / "mirror" / f"{project}-deepagents-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
         n_calls = sum(len(r["child_calls"]) for r in rows)
         n_deleg = sum(1 for r in rows if r["parent_node"] is not None)
         per_task.append({"task_index": i, "status": status, "seconds": round(time.time() - t0, 1),

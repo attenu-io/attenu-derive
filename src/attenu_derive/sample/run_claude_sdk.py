@@ -78,7 +78,7 @@ def make_registry(salt: str):
     return root, reg
 
 
-async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: int, budget: float):
+async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: int, budget: float, timeout_s: float = 600.0):
     from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, HookMatcher, ResultMessage, query
 
     root, reg = make_registry(salt)
@@ -115,12 +115,20 @@ async def run_task(task: str, *, repo: Path, model: str, salt: str, max_turns: i
                "parent_tool_use_id": None, "session_id": "attenu-sample"}
 
     status, usage, cost = "ok", {}, None
-    try:
+
+    async def _consume():
+        nonlocal status, usage, cost
         async for message in query(prompt=_prompt(), options=options):
             if isinstance(message, ResultMessage):
                 status = f"result:{message.subtype}"
                 usage = dict(getattr(message, "usage", None) or {})
                 cost = getattr(message, "total_cost_usd", None)
+    try:
+        # HARD wall-clock cap per task: a stalled CLI (e.g. subscription window exhausted -> silent
+        # backoff) must not hang the batch. The audit log is complete up to the stall either way.
+        await asyncio.wait_for(_consume(), timeout=timeout_s)
+    except asyncio.TimeoutError:
+        status = f"error: Timeout: task exceeded {timeout_s:.0f}s wall clock (stalled CLI?)"
     except Exception as exc:
         status = f"error: {type(exc).__name__}: {str(exc)[:120]}"
     return root, reg, delegations, status, usage, cost
@@ -137,6 +145,7 @@ def main(argv=None) -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--budget-usd", type=float, default=3.0, help="SDK notional cap per task (subscription-billed)")
+    ap.add_argument("--timeout-s", type=float, default=600.0, help="HARD per-task wall-clock cap (guardrail against stalled CLI)")
     args = ap.parse_args(argv)
 
     repo = Path(args.repo).resolve(); project = args.project or repo.name
@@ -155,7 +164,7 @@ def main(argv=None) -> int:
     for i, task in enumerate(tasks):
         t0 = time.time()
         root, reg, delegations, status, usage, cost = asyncio.run(
-            run_task(task, repo=repo, model=args.model, salt=salt, max_turns=args.max_turns, budget=args.budget_usd))
+            run_task(task, repo=repo, model=args.model, salt=salt, max_turns=args.max_turns, budget=args.budget_usd, timeout_s=args.timeout_s))
         entries = root.audit_log().entries
         (out / "runs" / run_id / f"task{i}-audit.jsonl").write_text(
             "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n")
@@ -176,6 +185,9 @@ def main(argv=None) -> int:
                 from attenu_derive.corpus.export import _task_features
                 r["task_features"] = _task_features(text); mr["task"] = text
         corpus_rows += rows; mirror_rows += mrows
+        # incremental export: a killed/stalled batch still leaves rows on disk
+        (out / "corpus" / f"{project}-claude_sdk-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in corpus_rows) + "\n")
+        (out / "mirror" / f"{project}-claude_sdk-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
         n_calls = sum(len(r["child_calls"]) for r in rows); n_deleg = sum(1 for r in rows if r["parent_node"])
         per_task.append({"task_index": i, "status": status, "seconds": round(time.time() - t0, 1),
                          "delegations": n_deleg, "tool_calls": n_calls, "usage": usage, "cost_usd": cost,
@@ -187,7 +199,7 @@ def main(argv=None) -> int:
     (out / "mirror" / f"{project}-claude_sdk-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
     manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"},
                 "billing": "subscription (Claude Code); cost_usd is the SDK's notional API-equivalent incl. subagents",
-                "guardrails": {"max_turns": args.max_turns, "max_budget_usd": args.budget_usd},
+                "guardrails": {"max_turns": args.max_turns, "max_budget_usd": args.budget_usd, "timeout_s": args.timeout_s},
                 "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"]), "rows": len(corpus_rows),
                            "tool_calls": sum(len(r["child_calls"]) for r in corpus_rows),
