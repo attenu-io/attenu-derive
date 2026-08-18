@@ -32,7 +32,7 @@ def test_l1_orchestrator_template_grants_delegate_and_write_with_call_limit():
     assert auth.covers_scope("agent.delegate.researcher") and auth.covers_scope("fs.write")
     assert not auth.covers_scope("agent.delegate.exfiltrator")
     assert not auth.covers_scope("fs.read")            # rubric v1: explicit "delegate the reading" -> no reads
-    cl = auth.ceiling("max_calls"); assert cl is not None and cl.max_calls == 5
+    cl = auth.ceiling("max_calls[fs.write]"); assert cl is not None and cl.max_calls == 5 and cl.applies_to == "fs.write"
     assert rec.spec["ceilings"][0].get("applies_to") == "fs.write" or any(c.get("applies_to") == "fs.write" for c in rec.spec["ceilings"])
 
 
