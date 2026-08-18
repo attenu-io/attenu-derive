@@ -12,3 +12,4 @@ corpus-blobs/
 traces/
 *.jsonl
 !src/attenu_derive/corpus/gold/*.jsonl
+data/
