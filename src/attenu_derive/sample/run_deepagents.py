@@ -54,20 +54,41 @@ RESEARCHER = {
                       "efficiently (few, targeted reads). Return concise findings with file paths and line "
                       "references. Do NOT write files."),
 }
+# T14 (2026-08-18): fan-out specialists — one task -> 3-5 delegations, so the paid path's USD/event drops ~4x.
+SPECIALISTS = [
+    RESEARCHER,
+    {"name": "security-reviewer", "description": "Finds security-relevant code paths (input parsing, file/network access, auth, escaping, secrets).",
+     "system_prompt": "You are a security reviewer. Use ls, glob, grep and read_file (few, targeted reads) to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files."},
+    {"name": "test-analyst", "description": "Explains how tests are organized and run.",
+     "system_prompt": "You analyse the test suite: locate tests, runners, CI config with ls/glob/grep/read_file (few, targeted reads); report how to run them, with file paths. Do NOT write files."},
+    {"name": "api-surveyor", "description": "Maps the public API / CLI surface and deprecations.",
+     "system_prompt": "You map the public API or CLI surface: entry points, exported functions/commands, deprecated items; use ls/glob/grep/read_file (few, targeted reads); report with file paths. Do NOT write files."},
+]
+FANOUT_TASKS = [
+    "Produce REPORT.md for this repository with four sections: architecture, security-relevant paths, tests, public API. "
+    "Delegate EACH section to its specialist sub-agent via the task tool (researcher, security-reviewer, test-analyst, api-surveyor), "
+    "one after another; do all reading through them; then write REPORT.md yourself with write_file and finish.",
+    "Write ONBOARDING.md for a new contributor: how the code is organized (researcher), what to be careful about security-wise "
+    "(security-reviewer), how to run the tests (test-analyst), and which public APIs or commands matter (api-surveyor). "
+    "Delegate every reading task to those sub-agents via the task tool; write only the final file yourself.",
+    "Assess this repository for a security review: delegate exploration to the researcher and the security-reviewer, ask the "
+    "test-analyst whether security-relevant paths are covered by tests, and the api-surveyor which public APIs expose those paths. "
+    "Write SECURITY_ASSESSMENT.md yourself; do all reading through the sub-agents.",
+]
 
 
-def build_agent(*, model, repo: Path, guarded: GuardedDelegation):
+def build_agent(*, model, repo: Path, guarded: GuardedDelegation, fanout: bool = False):
     from deepagents import create_deep_agent
     from deepagents.backends import FilesystemBackend
 
     mw = guarded.middleware()
-    subagents = [dict(RESEARCHER, model=model, middleware=[mw])]
+    subagents = [dict(sa, model=model, middleware=[mw]) for sa in (SPECIALISTS if fanout else [RESEARCHER])]
+    who = "the specialist sub-agents (researcher, security-reviewer, test-analyst, api-surveyor)" if fanout else "the researcher sub-agent"
     return create_deep_agent(
         model=model,
         tools=[],
-        system_prompt=("You are a senior engineer analysing a repository. Delegate exploration to the "
-                       "researcher sub-agent via the task tool; keep your own tool use minimal; write "
-                       "exactly the file the task asks for and finish."),
+        system_prompt=(f"You are a senior engineer analysing a repository. Delegate exploration to {who} "
+                       "via the task tool; keep your own tool use minimal; write exactly the file the task asks for and finish."),
         middleware=[mw],
         subagents=subagents,
         backend=FilesystemBackend(root_dir=str(repo), virtual_mode=True),
@@ -142,7 +163,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default="data", help="output root (gitignored)")
     ap.add_argument("--project", default=None, help="corpus project name (default: repo dir name)")
     ap.add_argument("--model", default="claude-haiku-4-5-20251001")
-    ap.add_argument("--tasks", default=None, help="file with one task per line (default: built-in 5)")
+    ap.add_argument("--tasks", default=None, help="file with one task per line (default: built-in 5, or the fan-out 3 with --fanout)")
+    ap.add_argument("--fanout", action="store_true", help="fan-out workload: 4 specialist sub-agents, one task -> 3-5 delegations (T14)")
     ap.add_argument("--limit", type=int, default=None, help="only run the first N tasks")
     ap.add_argument("--recursion-limit", type=int, default=40)
     ap.add_argument("--max-tokens", type=int, default=2048)
@@ -161,7 +183,7 @@ def main(argv=None) -> int:
 
     repo = Path(args.repo).resolve()
     project = args.project or repo.name
-    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else DEFAULT_TASKS
+    tasks = [t.strip() for t in Path(args.tasks).read_text().splitlines() if t.strip()] if args.tasks else (FANOUT_TASKS if args.fanout else DEFAULT_TASKS)
     if args.limit:
         tasks = tasks[: args.limit]
 
@@ -176,7 +198,7 @@ def main(argv=None) -> int:
     corpus_rows, mirror_rows, per_task = [], [], []
     for i, task in enumerate(tasks):
         root, guarded = make_guarded(salt)
-        agent = build_agent(model=model, repo=repo, guarded=guarded)
+        agent = build_agent(model=model, repo=repo, guarded=guarded, fanout=args.fanout)
         t0 = time.time(); status = "ok"
         # Usage via callback, so it is captured even when the run ends in an exception
         # (e.g. GraphRecursionError) — the audit log is complete either way.
@@ -222,7 +244,8 @@ def main(argv=None) -> int:
     (out / "mirror" / f"{project}-deepagents-{run_id}.jsonl").write_text(
         "\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
     manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"},
-                "billing": "api", "guardrails": {"max_input_tokens": args.max_input_tokens, "recursion_limit": args.recursion_limit, "prompt_caching": True},
+                "billing": "api", "workload": "fanout" if args.fanout else "single-researcher",
+                "guardrails": {"max_input_tokens": args.max_input_tokens, "recursion_limit": args.recursion_limit, "prompt_caching": True},
                 "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"] is not None),
                            "rows": len(corpus_rows),
