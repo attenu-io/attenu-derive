@@ -16,7 +16,7 @@ hard per-task wall-clock timeout (fan-out path: 900 s), incremental per-task exp
 Observe mode uses the shim's ADK plugin hooks (`default_tool_authority`, `default_delegation`):
 every tool call is authorized-and-recorded with the redacted feature context; the `AgentTool`
 request text becomes the child's task on the spawn record (mirror only; hashed in the corpus).
-Tool names are the harness's own (`list_files`, `read_file`, `search_text`, `write_file`) —
+Tool names are the harness's own (`list_files`, `read_file`, `search_files`, `write_file`) —
 coverage on ADK rows is reported honestly, curated vs heuristic.
 """
 from __future__ import annotations
@@ -44,11 +44,11 @@ OBSERVE = Authority({"observe.*", "agent.delegate.*"}, [], ttl=None)
 
 SPECIALISTS = {   # name -> (description, instruction); names are ADK identifiers (snake_case)
     "researcher":        ("Explores the repository: lists, searches and reads files, and reports concise findings with file paths.",
-                          "You are a code researcher. Use list_files, search_text and read_file to explore efficiently (few, targeted reads). Return concise findings with file paths. Do NOT write files."),
+                          "You are a code researcher. Use list_files, search_files and read_file to explore efficiently (few, targeted reads). Return concise findings with file paths. Do NOT write files."),
     "security_reviewer": ("Finds security-relevant code paths (input parsing, file/network access, auth, escaping, secrets).",
-                          "You are a security reviewer. Use list_files, search_text and read_file to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files."),
+                          "You are a security reviewer. Use list_files, search_files and read_file to locate security-relevant code paths; report each with file path and one line of risk. Do NOT write files."),
     "test_analyst":      ("Explains how tests are organized and run.",
-                          "You analyse the test suite: locate tests, runners, CI config with list_files/search_text/read_file; report how to run them, with file paths. Do NOT write files."),
+                          "You analyse the test suite: locate tests, runners, CI config with list_files/search_files/read_file; report how to run them, with file paths. Do NOT write files."),
     "api_surveyor":      ("Maps the public API / CLI surface and deprecations.",
                           "You map the public API or CLI surface: entry points, exported functions/commands, deprecated items; report with file paths. Do NOT write files."),
 }
@@ -127,7 +127,7 @@ def make_plugin(salt: str):
 
 
 # ---- repository tools (read-only over the checkout; writes go to the run's artifacts dir) -----------------------
-_MAX_LIST = 200; _MAX_LINES = 200; _MAX_MATCHES = 100; _MAX_FILE_BYTES = 400_000
+_MAX_LIST = 80; _MAX_LINES = 120; _MAX_MATCHES = 40; _MAX_FILE_BYTES = 400_000     # trimmed after fd run: 300k tokens in ~30 LLM calls (Gemini re-sends every tool result each step)
 _SKIP_DIRS = {".git", "node_modules", "target", "dist", "build", "__pycache__", ".venv", "vendor"}
 
 
@@ -159,12 +159,12 @@ def make_tools(repo: Path, artifacts: Path):
         if not q.is_file():
             return {"error": "not a file"}
         if q.stat().st_size > _MAX_FILE_BYTES:
-            return {"error": "file too large; use search_text"}
+            return {"error": "file too large; use search_files"}
         lines = q.read_text(errors="replace").splitlines()
         lim = max(1, min(int(limit or _MAX_LINES), _MAX_LINES)); off = max(0, int(offset or 0))
         return {"path": path, "offset": off, "lines": lines[off: off + lim], "total_lines": len(lines)}
 
-    def search_text(pattern: str, glob: str = "**/*") -> dict:
+    def search_files(pattern: str, glob: str = "**/*") -> dict:
         """Search the repository for a regular expression; returns up to 100 matches as {path, line, text}."""
         rx = re.compile(pattern); hits = []
         for p in sorted(repo.glob(glob)):
@@ -186,14 +186,14 @@ def make_tools(repo: Path, artifacts: Path):
         (artifacts / name).write_text(content)
         return {"written": name, "bytes": len(content.encode())}
 
-    return list_files, read_file, search_text, write_file
+    return list_files, read_file, search_files, write_file
 
 
 def build_tree(*, model: str, repo: Path, artifacts: Path):
     from google.adk.agents.llm_agent import LlmAgent
     from google.adk.tools.agent_tool import AgentTool
-    list_files, read_file, search_text, write_file = make_tools(repo, artifacts)
-    specialists = [LlmAgent(name=n, model=model, description=d, instruction=i, tools=[list_files, read_file, search_text])
+    list_files, read_file, search_files, write_file = make_tools(repo, artifacts)
+    specialists = [LlmAgent(name=n, model=model, description=d, instruction=i, tools=[list_files, read_file, search_files])
                    for n, (d, i) in SPECIALISTS.items()]
     return LlmAgent(
         name="orchestrator", model=model, description="Senior engineer analysing a repository; delegates reading to specialists.",
