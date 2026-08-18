@@ -49,3 +49,23 @@ def test_role_violating_write_is_blocked_overreach_not_a_benign_block():
     assert rep["overreach_blocked_role"] >= 1                           # it is blocked over-reach (role violation)
     rep_nojoin = enforce_project([([ROOT, child], {})], "p")           # without the join it would (wrongly) look benign
     assert rep_nojoin["benign_blocks"] >= 1
+
+
+def test_all_three_evaluators_share_one_deriver_config():
+    """PM standing rule: shadow, adversarial and enforce grade the same corpus, so they must derive with the SAME
+    per-project config. All three go through eval.config.deriver_for; a divergence here once hid real evidence."""
+    from attenu_derive.eval.config import deriver_for, PROJECT_DOMAINS
+    import attenu_derive.eval.shadow as sh, attenu_derive.eval.adversarial as adv, attenu_derive.eval.enforce as enf
+    import inspect
+    for mod in (sh, adv, enf):
+        assert "deriver_for" in inspect.getsource(mod), mod.__name__
+    d = deriver_for("adk-customer-service")
+    assert d.domain is not None and "mail.send" in d.operator_grants          # the config a customer deploys
+    assert deriver_for("some-code-project").domain is None                     # code projects: base catalog
+    # with the shared config, shadow reports 0 would-block on customer-service (the pack curates it), matching enforce
+    import json, glob
+    rows_files = glob.glob("data/mirror/adk-customer-service-*.jsonl")
+    if rows_files:
+        rows = [json.loads(l) for l in open(rows_files[0]) if l.strip()]
+        rep = sh.shadow(rows, deriver_for("adk-customer-service"), sh.load_catalog())
+        assert rep["would_block"] == 0

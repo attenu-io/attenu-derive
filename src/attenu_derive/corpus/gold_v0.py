@@ -65,6 +65,7 @@ def label_row(r: dict, cat: dict) -> dict:
             "node": r.get("node"), "parent_node": r.get("parent_node"), "degenerate": degenerate,
             "tools_available": r.get("tools_available"), "subagent_tools": r.get("subagent_tools"),      # declared suites when the harness recorded them (ADK/CrewAI)
             "declared_subagents": r.get("declared_subagents"),                                          # T21: the declared roster (None on rows sampled before the field existed)
+            "role_constraints": r.get("role_constraints"), "completed": bool(r.get("completed", False)),      # carried onto the gold row so the committed gold is self-describing (lint)
             "task": r.get("task", ""), "observed_envelope": env, "delegated_to": r.get("delegated_to", []),
             "label": {"scopes": sorted(scopes), "ceilings": ceilings, "ttl_bucket_s": 900},
             "negatives": sorted(set(negatives)), "over_exploration": over,

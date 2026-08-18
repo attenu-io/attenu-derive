@@ -132,11 +132,13 @@ def _rows_of(path: Path) -> list[dict]:
 
 
 def adversarial_files(paths: list[Path]) -> dict:
-    d = Deriver(); cat = load_catalog(); per_project = defaultdict(Counter); misses = []; per_run = {}
+    from attenu_derive.eval.config import deriver_for
+    cat = load_catalog(); per_project = defaultdict(Counter); misses = []; per_run = {}
     for p in paths:
         rows = _rows_of(p)
         if not rows: continue
-        rep = adversarial(rows, d, cat); proj = rows[0].get("project")
+        proj = rows[0].get("project")
+        rep = adversarial(rows, deriver_for(proj), cat)            # shared config: domain packs applied here too
         c = per_project[proj]; c["nodes"] += rep["nodes"]; c["injected"] += rep["injected"]; c["blocked"] += rep["blocked"]
         for cls, v in rep["by_class"].items():
             c[f"{cls}:injected"] += v["injected"]; c[f"{cls}:blocked"] += v["blocked"]

@@ -109,13 +109,16 @@ def _run_key_of(path: Path, row: dict) -> str:
 def shadow_files(paths: list[Path]) -> dict:
     """One shadow per mirror FILE (= one run), then aggregated per project and overall. Joins the gold's negatives so a
     block on rubric-marked over-reach counts as blocked_overreach, not as a would-be benign block."""
-    d = Deriver(); cat = load_catalog(); per_run = {}; per_project = defaultdict(lambda: Counter()); negs = _gold_negatives()
+    from attenu_derive.eval.config import deriver_for
+    cat = load_catalog(); per_run = {}; per_project = defaultdict(lambda: Counter()); negs = _gold_negatives()
     for p in paths:
         rows = _rows_of(p)
         if not rows:
             continue
+        project = rows[0].get("project"); fw = rows[0].get("framework")
+        d = deriver_for(project)                                    # shared config: same domain pack + grants a customer deploys
         neg_by_node = {r["node"]: negs[(_run_key_of(p, r), r["node"])] for r in rows if (_run_key_of(p, r), r["node"]) in negs}
-        rep = shadow(rows, d, cat, negatives_by_node=neg_by_node); project = rows[0].get("project"); fw = rows[0].get("framework")
+        rep = shadow(rows, d, cat, negatives_by_node=neg_by_node)
         per_run[p.stem] = {"project": project, "framework": fw, **{k: rep[k] for k in ("nodes", "calls", "would_block", "blocked_overreach", "would_block_rate", "by_scope", "by_cause", "by_layer", "by_agent")},
                            "blocks": rep["blocks"][:50], "overreach": rep["overreach"][:20]}
         c = per_project[project]; c["nodes"] += rep["nodes"]; c["calls"] += rep["calls"]; c["would_block"] += rep["would_block"]; c["blocked_overreach"] += rep["blocked_overreach"]

@@ -26,19 +26,7 @@ from attenu_derive.derive.propose import Deriver
 from attenu_derive.eval import adversarial as adv
 from attenu_derive.eval import shadow as sh
 
-# What a customer would deploy per project: (domain pack, scopes the operator explicitly granted).
-PROJECT_DOMAINS = {
-    "adk-customer-service": ("retail-support", {"mail.send"}),      # operator enabled the two send_* tools
-    "adk-financial-advisor": ("finance-advisory", set()),
-}
-
-
-def _deriver_for(project: str) -> Deriver:
-    cfg = PROJECT_DOMAINS.get(project)
-    if cfg is None:
-        return Deriver()
-    name, grants = cfg
-    return Deriver(domain=load_domain(name), operator_grants=grants)
+from attenu_derive.eval.config import PROJECT_DOMAINS, deriver_for as _deriver_for
 
 
 def enforce_project(runs: list[tuple], project: str) -> dict:
