@@ -124,10 +124,14 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
             graph[a.name] = {"scopes": sorted(g.authority.scopes),
                              "narrower_than_root": g.is_narrower_than(root_guard) if a is not root_agent else None,
                              "parent": next((x.get("parent") for x in root_guard.audit_log().entries if x.get("event") == "spawn" and x.get("agent") == a.name), None)}
+    signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor")
     entries = root_guard.audit_log().entries
     ledger_denies = [e for e in entries if e.get("event") == "deny"]
     spawns = [e for e in entries if e.get("event") == "spawn"]
-    signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor")
+    # T33a: export the offline evidence bundle and verify it from the bundle ALONE (no engine) — the proof a reviewer runs
+    from delegation_guard import evidence
+    bundle = evidence.export_bundle(root_guard.audit_log(), signer)
+    bundle_check = evidence.verify_bundle(bundle, signer)
     anchor = root_guard.audit_log().anchor(signer)
     from delegation_guard import AuditLog
     anchor_ok, _ = AuditLog.verify_anchor(entries, anchor, signer)
@@ -136,7 +140,8 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
             "tool_calls": tool_calls, "denials_returned_to_model": denials,
             "ledger_deny_events": [{"scope": e.get("scope"), "tool": e.get("tool"), "reason": e.get("reason")} for e in ledger_denies],
             "ledger_entries": len(entries), "delegation_graph": graph, "spawns": [{"agent": e.get("agent"), "parent": e.get("parent")} for e in spawns],
-            "anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0}}
+            "anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0},
+            "evidence_bundle_offline_verify": bundle_check, "delegation_graph_view": evidence.delegation_graph(bundle)}
 
 
 def main(argv=None) -> int:

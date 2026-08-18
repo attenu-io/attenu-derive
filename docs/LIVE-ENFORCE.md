@@ -58,3 +58,13 @@ child. This is the mechanism the company is about, enforced on a live multi-agen
 
 Reproduce: `run_adk_enforce --app <financial_advisor> --prompt "Analyze market data for GOOGL" --domain
 finance-advisory [--hold web.search | --grant web.search] --model anthropic/claude-haiku-4-5-...`.
+
+## Offline-verifiable evidence bundle (T33a)
+
+Every enforce run exports an evidence bundle (the hash-chained ledger + a signed anchor) and re-verifies it
+from the bundle ALONE — no engine — via `delegation_guard.evidence.verify_bundle`. On the live customer-service
+benign run above the offline verifier returned `{integrity: true, monotonicity: true, containment: true}` with
+**3 authorized actions re-checked** against the acting node's authority; a deliberately altered bundle fails
+each check independently (`tests/test_core_v02.py`). `delegation_graph(bundle)` renders the chain (agents,
+authorities, allow/deny counts, edges) for a reviewer. This is the moat's "offline-verifiable audit trail": an
+auditor confirms every guarantee without trusting the engine that produced the log.
