@@ -45,3 +45,10 @@ def test_catalog_v1_curates_common_tier2_verbs_and_shell_commands():
         e = resolve(cat, tool); assert e and e["scope"] == scope and not e.get("heuristic"), (tool, e)
     assert resolve(cat, "place_order")["heuristic"] is True       # deliberately NOT curated: pins the withheld path
     assert resolve(cat, "Hotels_4_SearchHotel")["scope"] == "data.read"   # patterns must not swallow the reads
+
+
+def test_adk_builtin_tools_are_curated():
+    cat = load_catalog()
+    assert resolve(cat, "google_search")["scope"] == "web.search" and not resolve(cat, "google_search").get("heuristic")
+    assert resolve(cat, "transfer_to_agent")["scope"] == "agent.delegate"
+    assert resolve(cat, "load_web_page")["scope"] == "web.fetch"

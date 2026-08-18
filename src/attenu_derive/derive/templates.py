@@ -29,7 +29,7 @@ _NO_WRITE = re.compile(r"\b(do not write|don't write|no writes?|read[- ]only)\b"
 # match (it would deny the needed web/mail/payment call) — fall through to L2 (catalog) instead.
 _NON_LOCAL = re.compile(r"\b(fetch|download|website|web ?site|url|https?://|api call|e-?mail|mail|send|pay|payment|transfer|deploy|push|upload|post to|purchase|buy|reserve|book (a|an|the|me|us)|place (an|the|a) order|order (a|an|the|from|online))\b", re.I)   # money/booking VERB phrases only — not "in order to" / "book of"
 
-EXPLORER_FAMILIES = frozenset({"fs.read", "data.read"})              # tier-0 read families an explorer may hold
+EXPLORER_FAMILIES = frozenset({"fs.read", "data.read", "web.search", "web.fetch", "db.read", "crm.read"})   # READ-side families (tier<=1) an explorer/analyst may hold — a web-reading analyst is still read-only
 WRITER_FAMILIES = frozenset({"fs.write", "data.write"})              # tier-1 write families a delegating-writer may hold
 L1_MAX_TIER = 1                                                      # L1 never grants a tier-2 family (payments, mail, deletes, exec)
 

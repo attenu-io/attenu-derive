@@ -34,6 +34,14 @@ tools:
   SendMessage: {scope: agent.message, consumes: {}, tier: 1}
   ListAgents:  {scope: agent.message, consumes: {}, tier: 1}    # teammate discovery — messaging family (curated from cobra sampling)
   TodoWrite:   {scope: state.write, consumes: {}, tier: 0}
+  # --- Google ADK built-in tools (google.adk.tools) ---------------------------------------
+  google_search:     {scope: web.search, consumes: {}, tier: 1}
+  load_web_page:     {scope: web.fetch,  consumes: {url: egress}, tier: 1}
+  url_context:       {scope: web.fetch,  consumes: {}, tier: 1}
+  transfer_to_agent: {scope: agent.delegate, consumes: {agent_name: delegate_target}, tier: 1}
+  load_artifacts:    {scope: fs.read, consumes: {}, tier: 0}
+  load_memory:       {scope: data.read, consumes: {}, tier: 0}
+  preload_memory:    {scope: data.read, consumes: {}, tier: 0}
   # --- framework demo tools (delegation-guard examples) -----------------------------------
   crm_query:   {scope: crm.read,   consumes: {rows: max_rows}, tier: 1}
   crm_export:  {scope: crm.export, consumes: {destination: egress}, tier: 2}

@@ -230,3 +230,24 @@ def test_explorer_guard_matches_money_verbs_not_ordinary_english():
     a2, r2 = d.propose(_ev(task="Check the weather and book a flight for me", role="child", agent="bot",
                            tools_available=["get_weather_forecast", "book_flight"], parent_authority=WIDE))
     assert r2.template is None                                                       # money verb phrase -> falls to L2 as intended
+
+
+def test_l2_root_holds_the_delegation_subtree_closure_too():
+    """financial-advisor (real app): a coordinator with no L1 match holds only what ITS tools resolve to (AgentTool names ->
+    nothing), so its analysts' web.search was cut by the parent chain (20/20 blocked). The subtree closure is a general rule:
+    at L2 a node with declared sub-agents holds agent.delegate.<child> and the grantable families of the subtree's tools,
+    marked held_for_delegation — never tier 2, never wider than the subtree."""
+    d = Deriver()
+    ev = _ev(task="I want to analyze GOOGL. Please run the market data analysis for it.", role="root", agent="financial_coordinator",
+             tools_available=["data_analyst_agent", "trading_analyst_agent"], declared_subagents=["data_analyst_agent", "trading_analyst_agent"],
+             subagent_tools={"data_analyst_agent": ["google_search"], "trading_analyst_agent": []}, parent_authority=WIDE)
+    auth, rec = d.propose(ev)
+    assert rec.layer == "L2"
+    assert auth.covers_scope("agent.delegate.data_analyst_agent") and auth.covers_scope("agent.delegate.trading_analyst_agent")
+    assert auth.covers_scope("web.search") and rec.spec.get("held_for_delegation") == ["web.search"]
+    child, _ = d.propose(_ev(task="Analyze market data for GOOGL", role="child", agent="data_analyst_agent", tools_available=["google_search"], parent_authority=auth))
+    assert child.permits("web.search", {})
+    ev2 = _ev(task="Run the workflow", role="root", agent="coord", tools_available=["ops_agent"], declared_subagents=["ops_agent"],
+              subagent_tools={"ops_agent": ["read_file", "Bash", "send_email"]}, parent_authority=WIDE)
+    a2, r2 = d.propose(ev2)
+    assert a2.covers_scope("fs.read") and not a2.covers_scope("code.exec") and not a2.covers_scope("mail.send")   # tier 2 never held via heuristics/L2 closure

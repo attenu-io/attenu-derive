@@ -116,16 +116,32 @@ class Deriver:
                 scopes.add(sc)
             for _arg, dim in (e.get("consumes") or {}).items():
                 if dim: consumed.add(dim)
+        # Subtree closure (rubric v1.2, generalised from L1 after the financial-advisor app): a node with declared
+        # sub-agents HOLDS agent.delegate.<child> and the grantable (tier <= HEURISTIC_MAX_TIER, or curated tier <= 1)
+        # families of the subtree's declared tools, marked held_for_delegation — child ⊆ parent, never tier 2 via closure.
+        held: set[str] = set()
+        for child in (ev.declared_subagents or []):
+            scopes.add(f"agent.delegate.{child}")
+        for child, ctools in (ev.subagent_tools or {}).items():
+            for t in ctools or []:
+                ce = resolve(self.catalog, t)
+                if ce is None or str(ce.get("scope", "")).startswith("unknown."): continue
+                csc = str(ce["scope"])
+                if csc in ("agent.delegate", "state.write") or int(ce.get("tier", 2)) > 1: continue
+                if csc not in scopes: held.add(csc)
+        scopes |= held
         if not scopes:
             return None
         if "max_rows" in consumed or "fs.read" in scopes:
             ceilings.append({"type": "RowLimit", "max": 1000})
         if "fs.write" in scopes:
             ceilings.append({"type": "CallLimit", "max": 5, "applies_to": "fs.write"})
-        egress_needed = any(s in scopes for s in ("web.fetch", "web.search", "mail.send", "crm.export"))
+        egress_needed = any(s in (scopes | held) for s in ("web.fetch", "web.search", "mail.send", "crm.export"))
         ceilings.append({"type": "EgressRank", "level": "internal" if egress_needed else "none"})
-        return ({"scopes": sorted(scopes), "ceilings": ceilings, "ttl": 900},
-                {"unknown_tools": unknown, "consumed": sorted(consumed), "heuristic_grants": heuristic_used, "withheld_heuristic": withheld})
+        spec = {"scopes": sorted(scopes), "ceilings": ceilings, "ttl": 900}
+        if held: spec["held_for_delegation"] = sorted(held)
+        return (spec, {"unknown_tools": unknown, "consumed": sorted(consumed), "heuristic_grants": heuristic_used, "withheld_heuristic": withheld,
+                       "held_for_delegation": sorted(held)})
 
     # ---- the pipeline ------------------------------------------------------------------
     def propose(self, ev: DelegationEvent) -> tuple[Authority, DerivationRecord]:
