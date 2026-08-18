@@ -1,0 +1,29 @@
+# Closed caveat vocabulary v1 (draft, P0). Versioned; the L3 output JSON schema is GENERATED from this.
+version: 1
+scopes:
+  # resource families (draft ~60 target; seed) — verbs: read | write | export | send | exec | delegate
+  - crm.read
+  - crm.write
+  - crm.export
+  - mail.read
+  - mail.send
+  - fs.read
+  - fs.write
+  - fs.delete
+  - web.fetch
+  - web.search
+  - code.exec
+  - db.read
+  - db.write
+  - payments.transfer
+  - agent.delegate.*
+ceilings:            # existing delegation-guard types only
+  - RowLimit
+  - SpendCap
+  - CallLimit
+  - EgressRank       # none | internal | any
+  - Allow            # fields: region, recipient_domain, repo
+  - Deny
+  - Prefix           # fields: path
+ttl_buckets_seconds: [300, 900, 3600, 14400]
+unknown_tool_scope: "unknown.<tool>"   # granted by no template — fail-closed

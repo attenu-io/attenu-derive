@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "attenu-derive"
+version = "0.0.1"
+description = "Attenu derivation engine — task -> minimal enforceable authority for delegation-guard (PRIVATE)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Attenu" }]
+dependencies = ["delegation-guard>=0.2"]     # the enforcement shim; the engine proposes, the shim's meet disposes
+
+[project.optional-dependencies]
+retrieval = []          # ADR-08: heavy retrieval deps stay behind an extra (chosen in P2)
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.50"]     # OpenAI-compatible incl. Azure/Bedrock gateways
+dev = ["pytest>=8", "hypothesis>=6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/attenu_derive"]

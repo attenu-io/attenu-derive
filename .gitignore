@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.hypothesis/
+.venv/
+.DS_Store
+# corpus blobs and any captured traces live in the encrypted bucket + local mirror, never here (ADR-04/05)
+corpus-blobs/
+traces/
+*.jsonl
+!src/attenu_derive/corpus/gold/*.jsonl

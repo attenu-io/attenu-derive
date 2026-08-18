@@ -1,0 +1,12 @@
+name: ci
+on: { push: {}, pull_request: {}, workflow_dispatch: {} }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: |
+          pip install -q -e '.[dev]' 'delegation-guard @ git+https://github.com/rafaelasor/delegation-guard.git' 2>/dev/null || pip install -q -e '.[dev]' --no-deps
+          python -m pytest -q
