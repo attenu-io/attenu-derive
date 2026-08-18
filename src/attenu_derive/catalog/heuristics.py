@@ -26,7 +26,7 @@ import re
 
 HEURISTIC_MAX_GRANT_TIER = 1
 
-_TIER = {"data.read": 0, "compute.pure": 0, "fs.read": 0,
+_TIER = {"data.read": 0, "compute.pure": 0, "fs.read": 0, "crm.read": 1, "crm.write": 1, "crm.export": 2,
          "data.write": 1, "fs.write": 1, "web.fetch": 1, "web.search": 1, "device.actuate": 1, "agent.message": 1,
          "payments.transfer": 2, "mail.send": 2, "data.delete": 2, "fs.delete": 2, "code.exec": 2}
 
@@ -39,7 +39,7 @@ SHELL = {**{c: "fs.read" for c in ("cat", "cd", "ls", "pwd", "find", "grep", "wc
 READ_VERBS = {"get", "list", "read", "retrieve", "fetch", "show", "display", "view", "check", "search", "find", "query", "filter",
               "lookup", "describe", "is", "has", "verify", "validate", "browse", "inspect", "monitor", "look", "locate", "count",
               "status", "info", "preview", "peek", "poll", "watch", "explore", "scan", "load", "obtain", "recommend", "detail",
-              "details", "compare", "select", "who", "what", "which"}
+              "details", "compare", "select", "who", "what", "which", "access"}
 COMPUTE_VERBS = {"calc", "calculate", "compute", "convert", "solve", "predict", "simulate", "analyze", "analyse", "integrate",
                  "differentiate", "estimate", "generate", "plot", "draw", "translate", "classify", "identify", "recognize",
                  "recognise", "detect", "optimize", "optimise", "minimize", "maximize", "normalize", "transform", "encode",
@@ -128,6 +128,7 @@ WRITE_NOUNS = {"todo", "todos", "reminder", "reminders", "note", "notes", "log",
                "task", "tasks", "appointment", "appointments", "progress", "state", "flag", "flags", "tag", "tags", "label",
                "labels", "bookmark", "bookmarks", "alert", "alerts", "action"}
 FILE_NOUNS = {"file", "files", "dir", "directory", "directories", "folder", "folders", "path", "paths", "filesystem", "fs"}
+CRM_NOUNS = {"crm", "salesforce", "hubspot", "zendesk", "dynamics", "zoho", "pipedrive", "freshdesk", "intercom"}   # first real-domain app: customer service
 FS_WRITE_VERBS = {"write", "create", "save", "append", "edit", "update", "put", "upload", "touch", "mkdir", "move", "mv", "copy", "cp",
                   "rename", "transfer", "modify", "change", "add", "insert"}
 FS_DELETE_VERBS = {"delete", "remove", "rm", "unlink", "erase", "purge", "wipe", "clear"}
@@ -188,7 +189,13 @@ def heuristic_resolve(name: str, description: str = "") -> dict | None:
     if tset & {"handover", "handoff", "escalate", "escalation"} or ("agent" in tset and tset & {"transfer", "hand", "route", "connect"}) \
             or ("support" in tset and tset & {"contact", "call", "request", "ask", "reach"}) or ("human" in tset and tset & {"agent", "operator", "transfer"}):
         return _res("agent.message", "handoff")
-    # 3b. exports need curation (egress family that the closed vocabulary only has for CRM)
+    # 3b. CRM family (the vocabulary has crm.read / crm.write / crm.export): verb decides, export is egress (tier 2)
+    if tset & CRM_NOUNS:
+        if "export" in tset: return _res("crm.export", "crm+export")
+        if tset & (READ_VERBS - {"access"}) and not tset & (WRITE_VERBS | DELETE_VERBS): return _res("crm.read", "crm+read-verb")
+        if tset & (WRITE_VERBS | DELETE_VERBS): return _res("crm.write", "crm+write-verb")
+        return _res("crm.read", "crm-noun")
+    # 3c. other exports need curation (an egress family the closed vocabulary only has for CRM)
     if "export" in tset:
         return None
     # 4. the FIRST verb token decides (last dotted segment first, then the whole name); device verbs need a device noun

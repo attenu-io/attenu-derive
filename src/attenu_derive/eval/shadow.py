@@ -41,11 +41,13 @@ def _scope_of(cat: dict, tool: str, row: dict) -> str:
     return sc
 
 
-def shadow(rows: list[dict], deriver: Deriver | None = None, cat: dict | None = None) -> dict:
-    """rows = the mirror rows of ONE run (root first, spawns in seq order; task text present)."""
-    deriver = deriver or Deriver(); cat = cat or load_catalog()
+def shadow(rows: list[dict], deriver: Deriver | None = None, cat: dict | None = None, negatives_by_node: dict[str, set] | None = None) -> dict:
+    """rows = the mirror rows of ONE run (root first, spawns in seq order; task text present).
+    negatives_by_node = {node: {tool,...}} from the rubric (gold): calls the label marks as over-reach. A block on one of
+    those is `blocked_overreach` (a block we WANT), not a would-be benign block; without the join every block counts as benign."""
+    deriver = deriver or Deriver(); cat = cat or load_catalog(); negatives_by_node = negatives_by_node or {}
     derived: dict[str, object] = {}; proposals: dict[str, object] = {}; recs: dict[str, object] = {}
-    blocks: list[dict] = []; calls = 0; by_layer = Counter()
+    blocks: list[dict] = []; overreach: list[dict] = []; calls = 0; by_layer = Counter()
     for r in rows:                                   # file order = spawn order: parents precede children
         node = r["node"]; parent = r.get("parent_node")
         ev = event_from_row(r, task_text=r.get("task") or "")
@@ -68,33 +70,53 @@ def shadow(rows: list[dict], deriver: Deriver | None = None, cat: dict | None = 
             if ok:
                 continue
             own = proposal.permits(sc, ctx)
-            blocks.append({"node": node, "agent": r.get("agent"), "parent": parent, "tool": tool, "scope": sc,
-                           "reasons": [x.code for x in ok.reasons], "cause": "parent-chain" if own else "proposal",
-                           "layer": rec.layer, "template": rec.template,
-                           "parent_scopes": sorted(derived[parent].scopes) if parent in derived else None})
-    return {"nodes": len(rows), "calls": calls, "would_block": len(blocks),
+            entry = {"node": node, "agent": r.get("agent"), "parent": parent, "tool": tool, "scope": sc,
+                     "reasons": [x.code for x in ok.reasons], "cause": "parent-chain" if own else "proposal",
+                     "layer": rec.layer, "template": rec.template,
+                     "parent_scopes": sorted(derived[parent].scopes) if parent in derived else None}
+            (overreach if tool in negatives_by_node.get(node, set()) else blocks).append(entry)
+    return {"nodes": len(rows), "calls": calls, "would_block": len(blocks), "blocked_overreach": len(overreach),
             "would_block_rate": round(len(blocks) / calls, 4) if calls else None,
             "by_scope": dict(Counter(b["scope"] for b in blocks)), "by_cause": dict(Counter(b["cause"] for b in blocks)),
             "by_layer": dict(by_layer), "by_agent": dict(Counter(b["agent"] for b in blocks)),
             "derived": {n: {"scopes": sorted(a.scopes), "layer": recs[n].layer, "template": recs[n].template} for n, a in derived.items()},
-            "blocks": blocks}
+            "blocks": blocks, "overreach": overreach}
 
 
 def _rows_of(path: Path) -> list[dict]:
     return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
 
+def _gold_negatives() -> dict[tuple, set]:
+    """(run_key, node) -> negatives from the committed gold (rubric): the over-reach the label does not admit."""
+    from attenu_derive.eval.g1 import GOLD
+    out: dict[tuple, set] = {}
+    if GOLD.exists():
+        for l in GOLD.read_text().splitlines():
+            if l.strip():
+                g = json.loads(l)
+                if g.get("negatives"): out[(g.get("run_key"), g.get("node"))] = set(g["negatives"])
+    return out
+
+
+def _run_key_of(path: Path, row: dict) -> str:
+    stem = path.stem.split("-"); run_id = stem[-2] + "-" + stem[-1]              # <project>-<tag>-<YYYYMMDDTHHMMSS>-<hex>
+    return f"{run_id}:{(row.get('run') or {}).get('task_index')}"
+
+
 def shadow_files(paths: list[Path]) -> dict:
-    """One shadow per mirror FILE (= one run), then aggregated per project and overall."""
-    d = Deriver(); cat = load_catalog(); per_run = {}; per_project = defaultdict(lambda: Counter())
+    """One shadow per mirror FILE (= one run), then aggregated per project and overall. Joins the gold's negatives so a
+    block on rubric-marked over-reach counts as blocked_overreach, not as a would-be benign block."""
+    d = Deriver(); cat = load_catalog(); per_run = {}; per_project = defaultdict(lambda: Counter()); negs = _gold_negatives()
     for p in paths:
         rows = _rows_of(p)
         if not rows:
             continue
-        rep = shadow(rows, d, cat); project = rows[0].get("project"); fw = rows[0].get("framework")
-        per_run[p.stem] = {"project": project, "framework": fw, **{k: rep[k] for k in ("nodes", "calls", "would_block", "would_block_rate", "by_scope", "by_cause", "by_layer", "by_agent")},
-                           "blocks": rep["blocks"][:50]}
-        c = per_project[project]; c["nodes"] += rep["nodes"]; c["calls"] += rep["calls"]; c["would_block"] += rep["would_block"]
+        neg_by_node = {r["node"]: negs[(_run_key_of(p, r), r["node"])] for r in rows if (_run_key_of(p, r), r["node"]) in negs}
+        rep = shadow(rows, d, cat, negatives_by_node=neg_by_node); project = rows[0].get("project"); fw = rows[0].get("framework")
+        per_run[p.stem] = {"project": project, "framework": fw, **{k: rep[k] for k in ("nodes", "calls", "would_block", "blocked_overreach", "would_block_rate", "by_scope", "by_cause", "by_layer", "by_agent")},
+                           "blocks": rep["blocks"][:50], "overreach": rep["overreach"][:20]}
+        c = per_project[project]; c["nodes"] += rep["nodes"]; c["calls"] += rep["calls"]; c["would_block"] += rep["would_block"]; c["blocked_overreach"] += rep["blocked_overreach"]
         for k, v in rep["by_cause"].items(): c[f"cause:{k}"] += v
         for k, v in rep["by_scope"].items(): c[f"scope:{k}"] += v
     total = Counter()
@@ -120,12 +142,12 @@ def main(argv=None) -> int:
     stamp = time.strftime("%Y%m%d")
     (out / f"shadow-{stamp}.json").write_text(json.dumps(rep, indent=2))
     md = [f"# Shadow report — {rep['date']} (would-deny mode; derived authority down the REAL chain; nothing blocked)", "",
-          "| project | nodes | calls | would-be benign blocks | rate | by cause | by scope |", "|---|---|---|---|---|---|---|"]
+          "| project | nodes | calls | would-be benign blocks | rate | blocked over-reach | by cause | by scope |", "|---|---|---|---|---|---|---|---|"]
     for proj, c in sorted(rep["per_project"].items()):
         cause = ", ".join(f"{k[6:]}={v}" for k, v in c.items() if k.startswith("cause:")) or "—"
         scope = ", ".join(f"{k[6:]}={v}" for k, v in c.items() if k.startswith("scope:")) or "—"
-        md.append(f"| {proj} | {c['nodes']} | {c['calls']} | {c['would_block']} | {c['would_block_rate']} | {cause} | {scope} |")
-    t = rep["total"]; md.append(f"| **all** | {t['nodes']} | {t['calls']} | {t['would_block']} | {t['would_block_rate']} | | |")
+        md.append(f"| {proj} | {c['nodes']} | {c['calls']} | {c['would_block']} | {c['would_block_rate']} | {c.get('blocked_overreach', 0)} | {cause} | {scope} |")
+    t = rep["total"]; md.append(f"| **all** | {t['nodes']} | {t['calls']} | {t['would_block']} | {t['would_block_rate']} | {t.get('blocked_overreach', 0)} | | |")
     (out / f"shadow-{stamp}.md").write_text("\n".join(md) + "\n")
     print(json.dumps({"per_project": rep["per_project"], "total": rep["total"]}, indent=2))
     return 0

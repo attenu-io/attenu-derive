@@ -109,3 +109,14 @@ def test_out_of_sample_generalizations_from_hermes_and_toolace():
         assert heuristic_resolve(name)["scope"] == "data.read", name                    # verb-less plural lookup nouns
     assert heuristic_resolve("United States Transit Stations Mobility API")["scope"] == "data.read"
     assert heuristic_resolve("Commify") is None                                         # nonsense stays unresolved
+
+
+def test_real_domain_gaps_from_the_customer_service_app():
+    """First real-world (non-code) workload: google/adk-samples customer-service. 'access' is a read verb; CRM tools land in the
+    vocabulary's crm.* families; messaging tools stay tier 2 (mail.send) — correct until curated."""
+    assert heuristic_resolve("access_cart_information")["scope"] == "data.read"
+    assert heuristic_resolve("update_salesforce_crm")["scope"] == "crm.write"
+    assert heuristic_resolve("get_crm_contact")["scope"] == "crm.read"
+    assert heuristic_resolve("export_hubspot_contacts")["scope"] == "crm.export"
+    assert heuristic_resolve("send_care_instructions")["scope"] == "mail.send"
+    assert heuristic_resolve("modify_cart")["tier"] == 2                                   # a cart write is money-adjacent: withheld until curated

@@ -39,6 +39,11 @@ def label_row(r: dict, cat: dict) -> dict:
     if not root and reads > 40: over.append(f"repeated broad reads ({reads})")
     if root and writes > 5: over.append(f"write loop ({writes} writes)")
     if root and reads: over.append(f"read directly instead of delegating ({reads})")
+    if RUBRIC_VERSION >= 1 and (r.get("role_constraints") or {}).get("no_write") and writes:
+        # ruling 1 applied to the ROLE prompt (2026-08-18): a specialist defined "Do NOT write files" that writes anyway is
+        # over-reach -> its writes are negatives, fs.write not admitted (the explorer template is right to withhold it)
+        write_tools = [c["tool"] for c in r["child_calls"] if (resolve(cat, c["tool"]) or {}).get("scope") == "fs.write"]
+        negatives += write_tools; scopes.discard("fs.write")
     if RUBRIC_VERSION >= 1:
         # ruling 1: explicit prompt contradiction -> the contradicting reads are negatives, fs.read not admitted
         if root and reads and _DELEGATE_ALL_READING.search(r.get("task") or ""):

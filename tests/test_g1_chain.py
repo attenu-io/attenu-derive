@@ -66,3 +66,20 @@ def test_gold_v12_marks_held_for_delegation_from_descendants():
     assert root["label"]["held_for_delegation"] == ["data.read", "fs.read"] and set(root["label"]["scopes"]) >= {"fs.read", "data.read", "fs.write"}
     assert child["label"]["held_for_delegation"] == ["data.read"] and "data.read" in child["label"]["scopes"]
     assert grandchild["label"]["held_for_delegation"] == []
+
+
+def test_gold_marks_writes_as_negatives_when_the_role_forbids_them():
+    """Ruling 1 extended (2026-08-18): the role prompt is part of the contract. A specialist whose definition says
+    'Do NOT write files' and writes anyway is over-reach (negative), not a benign use the template must admit."""
+    from attenu_derive.corpus.gold_v0 import label_row
+    from attenu_derive.catalog.coverage import load_catalog
+    row = {"event_id": "p:x", "project": "p", "framework": "langchain/deepagents", "agent": "researcher", "node": "n1", "parent_node": "n0",
+           "task": "Identify security-relevant code paths and report with file paths", "delegated_to": [], "negatives": [],
+           "role_constraints": {"no_write": True},
+           "child_calls": [{"tool": "read_file", "outcome": "allow", "quantities": {}}, {"tool": "write_file", "outcome": "allow", "quantities": {}}],
+           "observed_envelope": {"tools": ["read_file", "write_file"], "quantities_max": {}}}
+    g = label_row(row, load_catalog())
+    assert "write_file" in g["negatives"] and "fs.write" not in g["label"]["scopes"] and "fs.read" in g["label"]["scopes"]
+    row2 = dict(row, role_constraints={})
+    g2 = label_row(row2, load_catalog())
+    assert "write_file" not in g2["negatives"] and "fs.write" in g2["label"]["scopes"]        # without the constraint the v0 default stands

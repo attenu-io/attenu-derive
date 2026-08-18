@@ -276,6 +276,8 @@ def main(argv=None) -> int:
         rows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="hash"); mrows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="keep")
         for r, mr in zip(rows, mrows):
             r["tools_available"] = mr["tools_available"] = list(AGENT_TOOLS.get(r["agent"], []))            # declared suite (role-specific)
+            if r["parent_node"] is not None:
+                r["role_constraints"] = mr["role_constraints"] = {"no_write": True}                          # coworkers: "You never write files"
             if r["parent_node"] is None:
                 r["subagent_tools"] = mr["subagent_tools"] = {n: list(AGENT_TOOLS[n]) for n in SPECIALISTS}   # the delegation subtree a parent must cover
             if r["parent_node"] is None:

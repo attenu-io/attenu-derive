@@ -39,7 +39,7 @@ from attenu_derive.derive.propose import Deriver, DelegationEvent, FRAMEWORK_TOO
 GOLD = Path(__file__).resolve().parents[1] / "corpus" / "gold" / "gold-v1.2.jsonl"
 THRESHOLDS = Path(__file__).with_name("thresholds.json")
 QUP = {"0": 0, "1": 1, "2-10": 10, "11-100": 100, "101-1k": 1000, "1k-10k": 10_000, "10k-100k": 100_000, "100k-1M": 1_000_000, "1M+": 10_000_000}
-OBSERVE_PARENT = Authority({"fs.*", "data.*", "compute.pure", "device.actuate", "agent.delegate.*", "agent.message", "web.*", "code.exec"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)   # what a real observe root held (observe.*): every family the workload used
+OBSERVE_PARENT = Authority({"fs.*", "data.*", "crm.*", "mail.*", "payments.*", "db.*", "web.*", "code.exec", "compute.pure", "device.actuate", "agent.delegate.*", "agent.message"}, [RowLimit(1_000_000), EgressRank("any")], ttl=None)   # the WHOLE vocabulary: the eval's stand-in for an operator who holds everything, so only the deriver decides (a real observe root held observe.*)
 
 
 def _ctx_for(tool: str, entry: dict, qmax: dict) -> dict:

@@ -215,6 +215,8 @@ def main(argv=None) -> int:
         for d in delegations:
             pending.setdefault(d["agent_type"], []).append(d["task"])
         for r, mr in zip(rows, mrows):
+            if r["parent_node"] is not None:
+                r["role_constraints"] = mr["role_constraints"] = {"no_write": True}          # every specialist is defined "Do NOT write files"
             if r["parent_node"] is None:
                 r["task_hash"] = hashlib.sha256(f"{salt}\x1f{task}".encode()).hexdigest()[:16]; mr["task"] = task
             else:

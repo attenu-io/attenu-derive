@@ -267,6 +267,9 @@ def main(argv=None) -> int:
         run_i = dict(run_meta, task_index=i)
         rows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="hash")
         mrows = audit_to_corpus_rows(entries, run=run_i, task_text_mode="keep")
+        for r in rows + mrows:                       # role prompt is part of the contract: every specialist here is defined "Do NOT write files"
+            if r["parent_node"] is not None:
+                r["role_constraints"] = {"no_write": True}
         for r in rows:  # tag the root's task (root event has no task text) via features from the prompt
             if r["parent_node"] is None:
                 r["task_hash"] = hashlib.sha256(f"{salt}\x1f{task}".encode()).hexdigest()[:16]
