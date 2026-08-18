@@ -77,18 +77,22 @@ class BudgetExceeded(RuntimeError):
 
 
 class BudgetHook:
-    """Global CrewAI `after_llm_call` hook that ABORTS the crew when cumulative prompt tokens across ALL agents
-    pass the budget. It reads CrewAI's own per-LLM-instance usage tracking (`get_token_usage_summary`) as a
-    delta per call, so coworkers' calls (any LLM instance, any agent) are counted — the traffic that loops.
+    """Global CrewAI LLM hooks that ABORT the crew when cumulative prompt tokens across ALL agents pass the
+    budget. Usage is read from CrewAI's own per-LLM-instance tracking (`get_token_usage_summary`) as a delta
+    per hook firing, so coworkers' calls (any LLM instance, any agent) are counted — the traffic that loops.
     Abort = `HookAborted` (the one exception CrewAI's dispatcher propagates; anything else is swallowed).
-    CrewAI's executor RETRIES the LLM call after an aborted after-hook (observed: 5 extra paid calls), so a
-    `before_llm_call` hook raises as well once the budget is gone — no model call happens after the abort."""
+    Two lessons from live runs, both pinned by tests: (1) CrewAI SKIPS after_llm_call hooks for tool-call
+    responses on the native function-calling path (agent_utils._setup_after_llm_call_hooks) — an after-hook
+    fires once per agent execution — so the count happens at `before_llm_call`, which fires EVERY call (the
+    abort lands one call late, like ADK's after_model_callback); (2) the executor RETRIES after an aborted
+    after-hook, so the before-hook also raises once aborted — no model call happens after the abort."""
 
     def __init__(self, max_input_tokens: int):
         self.max = int(max_input_tokens); self.used = 0; self.output = 0; self.cached = 0; self.calls = 0
         self.by_agent: dict[str, int] = {}; self.aborted = False; self._seen: dict[int, tuple[int, int, int]] = {}
 
-    def _after(self, ctx):
+    def _account(self, ctx, *, count_call: bool) -> None:
+        """Fold the LLM instance's cumulative usage delta into the totals; raise HookAborted once over budget."""
         llm = getattr(ctx, "llm", None)
         try:
             u = llm.get_token_usage_summary()
@@ -98,19 +102,24 @@ class BudgetHook:
         cur = (int(getattr(u, "prompt_tokens", 0) or 0), int(getattr(u, "completion_tokens", 0) or 0), int(getattr(u, "cached_prompt_tokens", 0) or 0))
         self._seen[key] = cur
         d_in = max(0, cur[0] - prev[0]); d_out = max(0, cur[1] - prev[1]); d_c = max(0, cur[2] - prev[2])
-        self.used += d_in; self.output += d_out; self.cached += d_c; self.calls += 1
+        self.used += d_in; self.output += d_out; self.cached += d_c
+        if count_call: self.calls += 1
         role = getattr(getattr(ctx, "agent", None), "role", None) or "?"
         self.by_agent[role] = self.by_agent.get(role, 0) + d_in
         if self.used > self.max:
             self.aborted = True
             from crewai.hooks import HookAborted
             raise HookAborted(f"input-token budget exceeded: {self.used} > {self.max}", source=self)
-        return None
 
     def _before(self, ctx):
-        if self.aborted:                              # the executor retries after an aborted after-hook: stop BEFORE the model is called
+        if self.aborted:                              # the executor retries after an abort: stop BEFORE the model is called
             from crewai.hooks import HookAborted
             raise HookAborted(f"input-token budget exceeded: {self.used} > {self.max} (no further model calls)", source=self)
+        self._account(ctx, count_call=True)            # fires EVERY call: the previous call's usage is folded in here (one call late)
+        return None
+
+    def _after(self, ctx):
+        self._account(ctx, count_call=False)           # only fires on textual responses (native path skips tool-call lists): catches the last call
         return None
 
     def __enter__(self):

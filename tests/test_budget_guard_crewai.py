@@ -85,3 +85,41 @@ def test_budget_aborts_mid_run_including_the_coworker():
 
 def test_estimate_cost_haiku():
     assert estimate_cost("anthropic/claude-haiku-4-5-20251001", 1_000_000, 0) == pytest.approx(1.0)
+
+
+# ---- the NATIVE function-calling path (what a real crewai.LLM uses): CrewAI skips after_llm_call hooks for
+# tool-call responses (agent_utils._setup_after_llm_call_hooks: "hooks still run on the follow-up textual
+# response") — so an after-hook-only guard fires ONCE per agent execution. Found live (guzzle: 209,970 tokens
+# counted in one hook call against a 120k cap). The guard must count at before_llm_call, which fires every call.
+class NativeUsageScriptedLLM(UsageScriptedLLM):
+    def supports_function_calling(self) -> bool:
+        return True
+
+
+def _native_call(name: str, payload: dict) -> list:
+    return [{"id": f"call_{name}", "name": name, "input": payload}]
+
+
+def _run_native(max_input_tokens: int):
+    clear_all_global_hooks(); calls: list = []
+    llm = NativeUsageScriptedLLM(model="scripted/native", script={
+        "orchestrator": [_native_call("Delegate work to coworker", {"task": "explore the repo", "context": "c", "coworker": "researcher"}), "report written."],
+        "researcher": [_native_call("read_file", {"path": "a.md"}), _native_call("read_file", {"path": "b.md"}), _native_call("read_file", {"path": "c.md"}), "found."],
+    }, counters={})
+    root, bridge = make_bridge(salt="s"); budget = BudgetHook(max_input_tokens); err = None
+    try:
+        with bridge, budget:
+            _crew(llm, calls).kickoff()
+    except Exception as exc:              # noqa: BLE001
+        err = exc
+    finally:
+        clear_all_global_hooks()
+    return budget, calls, err
+
+
+def test_native_path_counts_every_call_and_aborts_per_call_not_per_agent():
+    budget, calls, err = _run_native(max_input_tokens=100 * STEP)
+    assert budget.calls >= 5 and budget.used >= 5 * STEP, (budget.calls, budget.used)     # every call seen, not one per agent
+    budget, calls, err = _run_native(max_input_tokens=int(1.5 * STEP))
+    assert budget.aborted and budget.used <= 3 * STEP, budget.used                          # stopped within one call of the cap
+    assert len(calls) <= 1                                                                  # the researcher's 2nd/3rd reads never ran
