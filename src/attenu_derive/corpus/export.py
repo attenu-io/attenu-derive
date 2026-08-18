@@ -74,7 +74,7 @@ def audit_to_corpus_rows(entries: Iterable[Mapping], *, run: Mapping, task_text_
             "task_features": _task_features(task) if task is not None else None,
             "parent_authority": granted if parent is not None else None,   # what THIS node was granted (observe: wildcard)
             "requested_authority": requested,
-            "child_calls": [], "negatives": [],
+            "child_calls": [], "negatives": [], "delegated_to": [],
             "label_provenance": "observed",
         }
         if task_text_mode == "keep" and task is not None:
@@ -89,6 +89,9 @@ def audit_to_corpus_rows(entries: Iterable[Mapping], *, run: Mapping, task_text_
         elif ev == "spawn":
             row = new_row(e["node"], e.get("agent"), e.get("parent"), e.get("task"), e.get("requested"), e.get("granted"))
             nodes[e["node"]] = row; order.append(e["node"])
+            parent = nodes.get(e.get("parent"))
+            if parent is not None:
+                parent["delegated_to"].append(e.get("agent"))
         elif ev in ("allow", "deny"):
             row = nodes.get(e.get("node"))
             if row is None:

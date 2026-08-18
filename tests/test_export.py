@@ -34,6 +34,7 @@ def test_one_row_per_delegation_event_with_child_calls():
     assert "summarize" not in json.dumps(child)
     assert child["task_hash"] and child["task_features"]["len_bucket"] == "11-100"
     assert child["source"] == "observed" and child["project"] == "demo" and child["framework"] == "langchain"
+    assert rows[0]["delegated_to"] == ["researcher"] and child["delegated_to"] == []   # spawns are authority too
 
 
 def test_task_text_can_be_kept_for_the_local_mirror_only():
