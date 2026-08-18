@@ -170,7 +170,7 @@ def main(argv=None) -> int:
 
     (out / "corpus" / f"{project}-claude_sdk-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in corpus_rows) + "\n")
     (out / "mirror" / f"{project}-claude_sdk-{run_id}.jsonl").write_text("\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
-    manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"}, "tasks": len(tasks), "results": per_task,
+    manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"}, "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"]), "rows": len(corpus_rows),
                            "tool_calls": sum(len(r["child_calls"]) for r in corpus_rows),
                            "cost_usd": sum((p["cost_usd"] or 0) for p in per_task)}}

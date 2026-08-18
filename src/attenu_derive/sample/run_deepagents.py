@@ -173,7 +173,7 @@ def main(argv=None) -> int:
     (out / "mirror" / f"{project}-deepagents-{run_id}.jsonl").write_text(
         "\n".join(json.dumps(r, sort_keys=True) for r in mirror_rows) + "\n")
     manifest = {"run_id": run_id, **{k: v for k, v in run_meta.items() if k != "salt"},
-                "tasks": len(tasks), "results": per_task,
+                "tasks": len(tasks), "task_texts": tasks, "results": per_task,
                 "totals": {"delegation_events": sum(1 for r in corpus_rows if r["parent_node"] is not None),
                            "rows": len(corpus_rows),
                            "tool_calls": sum(len(r["child_calls"]) for r in corpus_rows),
