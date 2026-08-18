@@ -94,6 +94,15 @@ def apply_held_for_delegation(gold_rows: list[dict]) -> None:
             g["label"]["scopes"] = sorted(set(g["label"]["scopes"]) | need)
 
 
+def is_truncated(*, task_truncated: bool, row: dict) -> bool:
+    """Per-NODE truncation (T21): a task cut short (timeout / cap / error) marks a node truncated only if that node did not
+    reach its lifecycle end (`completed`, from the shim's `done` event). Unknown lifecycle (rows sampled before the event
+    existed) stays conservative: truncated with the task."""
+    if not task_truncated:
+        return False
+    return not bool(row.get("completed"))
+
+
 def _truncation_index() -> dict:
     """(run_id, task_index) -> True when that task ended by error/timeout/budget (manifests)."""
     idx = {}
@@ -112,7 +121,8 @@ def main(argv=None) -> int:
         for line in Path(f).read_text().splitlines():
             if line.strip():
                 r = json.loads(line); g = label_row(r, cat)
-                g["truncated"] = bool(trunc.get((run_id, r.get("run", {}).get("task_index")), False))
+                g["truncated"] = is_truncated(task_truncated=bool(trunc.get((run_id, r.get("run", {}).get("task_index")), False)), row=r)
+                g["completed"] = bool(r.get("completed", False))
                 g["run_key"] = f"{run_id}:{r.get('run', {}).get('task_index')}"
                 gold.append(g)
     if RUBRIC_VERSION >= 1.2:

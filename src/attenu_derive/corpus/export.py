@@ -106,9 +106,15 @@ def audit_to_corpus_rows(entries: Iterable[Mapping], *, run: Mapping, task_text_
                 call["reason"] = e.get("reason")
                 row["negatives"].append(e.get("tool"))
             row["child_calls"].append(call)
+        elif ev == "done":                              # lifecycle end (shim Guard.complete()): the node returned to its caller
+            row = nodes.get(e.get("node"))
+            if row is not None:
+                row["completed"] = True
         # kill / spawn_denied are structural; not corpus rows.
 
     rows = [nodes[n] for n in order]
+    for r in rows:
+        r.setdefault("completed", False)
     for r in rows:
         r["observed_envelope"] = observed_envelope(r)
     return rows

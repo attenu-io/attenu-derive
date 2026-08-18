@@ -108,3 +108,13 @@ def test_declared_subagents_come_from_the_roster_not_from_observed_spawns():
     s2 = score([g2, _child()], Deriver(), load_catalog(), parent="chain")
     root_row2 = next(r for r in s2["per_row"] if r["agent"] == "orchestrator")
     assert "agent.delegate.security-reviewer" not in root_row2["granted"] and "agent.delegate.researcher" in root_row2["granted"]
+
+
+def test_truncation_is_per_node_when_lifecycle_is_known():
+    """A task cut short marks only the nodes that did NOT complete as truncated; a child that returned (`done`) is clean evidence."""
+    from attenu_derive.corpus.gold_v0 import is_truncated
+    assert is_truncated(task_truncated=True, row={"parent_node": "n0", "completed": True}) is False
+    assert is_truncated(task_truncated=True, row={"parent_node": "n0", "completed": False}) is True
+    assert is_truncated(task_truncated=True, row={"parent_node": "n0"}) is True                  # unknown lifecycle (older rows): conservative
+    assert is_truncated(task_truncated=True, row={"parent_node": None, "completed": False}) is True   # the root of a cut task is truncated
+    assert is_truncated(task_truncated=False, row={"parent_node": "n0", "completed": False}) is False

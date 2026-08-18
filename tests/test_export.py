@@ -62,3 +62,17 @@ def test_envelope_handles_negative_quantities():
     row = {"child_calls": [{"tool": "t", "outcome": "allow", "quantities": {"x": "neg"}},
                            {"tool": "t", "outcome": "allow", "quantities": {"x": "2-10"}}]}
     assert observed_envelope(row)["quantities_max"] == {"x": "2-10"}
+
+
+def test_export_marks_completed_from_done_events():
+    """T21 leak 2: per-node lifecycle end (shim `Guard.complete()` -> `done`) reaches the corpus row as `completed`."""
+    from delegation_guard import Authority, Guard
+    from attenu_derive.corpus.export import audit_to_corpus_rows
+    root = Guard.issue("orchestrator", Authority({"observe.*", "agent.delegate.*"}, [], ttl=None), task="t")
+    a = root.delegate("researcher", Authority({"observe.*"}, [], ttl=None), task="explore")
+    b = root.delegate("reviewer", Authority({"observe.*"}, [], ttl=None), task="review")
+    a.check("observe.read_file", tool="read_file"); a.complete()
+    b.check("observe.read_file", tool="read_file")                     # never completed: cut short
+    rows = audit_to_corpus_rows(root.audit_log().entries, run={"project": "p", "framework": "f", "salt": "s"}, task_text_mode="hash")
+    by = {r["agent"]: r for r in rows}
+    assert by["researcher"]["completed"] is True and by["reviewer"]["completed"] is False and by["orchestrator"]["completed"] is False
