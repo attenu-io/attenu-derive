@@ -130,9 +130,9 @@ def cmd_products(args) -> int:
 
 def cmd_demo(args) -> int:
     from attenu_derive.sample.demo_local import run_demo
-    rep = run_demo(Path(args.dir), slow=args.slow)
-    print(json.dumps({k: rep[k] for k in ("chain_id", "ledger_path", "bundle_path", "anchor_kid", "grants",
-                                           "child_scopes", "narrower_than_root", "denials_view")}, indent=2))
+    rep = run_demo(Path(args.dir), slow=args.slow, scenario=args.scenario)
+    print(json.dumps({k: rep[k] for k in ("scenario", "chain_id", "agents", "tools", "ledger_path", "bundle_path", "anchor_kid", "grants",
+                                           "narrower_than_root", "denials_view")}, indent=2))
     return 0
 
 
@@ -188,6 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser("products", help="products known on this machine"); pr.set_defaults(fn=cmd_products)
     d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")
     d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, metavar="SECONDS", help="pause SECONDS between steps so a watching UI animates (e.g. --slow 1); default 0 = instant")
+    d.add_argument("--scenario", choices=["basic", "fanout"], default="basic", help="basic: planner -> booker (2 agents); fanout: 9 agents / 18 tools, every disposition, a strike-policy revocation")
     d.set_defaults(fn=cmd_demo)
     po = sub.add_parser("policy", help="show / set this product's defaults for what the catalog cannot resolve (unknown tools: deny | heuristic)")
     po.add_argument("--dir", default="."); po.add_argument("--unknown-tools", choices=["deny", "heuristic"], default=None)
