@@ -171,3 +171,22 @@ def test_run_with_a_product_dir_uses_the_product_anchor_key_never_the_test_signe
     # and OUTSIDE a product the runner still works, but says so loudly
     out2 = R.write_evidence(Guard.issue("x", Authority({"crm.read"}, [], ttl=None), task="t"), None)
     assert out2["anchor_kid"] == "attenu-anchor-TEST" and out2["bundle_path"] is None
+
+
+def test_delegation_requests_include_the_agents_own_descendants():
+    """The T13 rule applied to the enforce runner: a mid-tree agent must be able to delegate to ITS declared children
+    (found live on travel-concierge: planning_agent -> flight_search_agent was denied out_of_authority because every
+    sub-agent was delegated the installation authority captured BEFORE the delegate scopes were added)."""
+    from attenu_derive.catalog.coverage import load_domain
+    from attenu_derive.sample.run_adk_enforce import delegation_requests, installation_authority
+    class A:
+        def __init__(self, name): self.name = name
+    agents = [A("root_agent"), A("planning_agent"), A("flight_search_agent"), A("hotel_search_agent"), A("booking_agent")]
+    subs = {"root_agent": {"planning_agent": [], "booking_agent": []}, "planning_agent": {"flight_search_agent": [], "hotel_search_agent": []}}
+    inst = installation_authority(load_domain("travel-planning"), set())
+    inst_full, delegations = delegation_requests(inst, agents, agents[0], subs)
+    assert {f"agent.delegate.{a.name}" for a in agents[1:]} <= set(inst_full.scopes)                  # root holds every descendant
+    assert {"agent.delegate.flight_search_agent", "agent.delegate.hotel_search_agent"} <= set(delegations["planning_agent"].scopes)
+    assert not {s for s in delegations["flight_search_agent"].scopes if s.startswith("agent.delegate.")}   # a leaf delegates to nobody
+    assert "agent.delegate.planning_agent" not in delegations["booking_agent"].scopes                      # only its OWN subtree
+    assert set(delegations["planning_agent"].scopes) <= set(inst_full.scopes)                              # requests never exceed the installation

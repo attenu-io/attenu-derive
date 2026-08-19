@@ -69,6 +69,31 @@ def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(
     return {name: ToolAuthority(scope, disposition=d) for name, (scope, d) in disp.items()}
 
 
+def delegation_requests(inst: Authority, agents, root_agent, subs_by_agent: dict) -> tuple[Authority, dict]:
+    """(installation authority incl. agent.delegate.* for EVERY non-root agent, {sub-agent: requested Authority}).
+    A parent holds what its delegation subtree needs (the T13 rule): each sub-agent requests the installation's
+    grantable scopes PLUS `agent.delegate.<x>` for its OWN declared descendants (transitively) — a mid-tree agent can
+    delegate to its children, a leaf delegates to nobody, nobody requests a sibling's subtree; `meet` narrows each
+    request to what its parent actually holds."""
+    names = {a.name for a in agents if a is not root_agent}
+    children = {a: set(c.keys()) for a, c in (subs_by_agent or {}).items()}
+
+    def descendants(name: str, seen=None) -> set[str]:
+        seen = seen if seen is not None else set()
+        for c in children.get(name, ()):
+            if c not in seen and c in names:
+                seen.add(c); descendants(c, seen)
+        return seen
+
+    inst_full = Authority(set(inst.scopes) | {f"agent.delegate.{n}" for n in names}, inst.ceilings, ttl=None)
+    delegations = {}
+    for a in agents:
+        if a is root_agent:
+            continue
+        delegations[a.name] = Authority(set(inst.scopes) | {f"agent.delegate.{d}" for d in descendants(a.name)}, inst.ceilings, ttl=None)
+    return inst_full, delegations
+
+
 def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float, hold: set[str] | None = None):
     import asyncio
     from google.adk.agents.run_config import RunConfig
@@ -92,10 +117,9 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     hold = hold or set()
     if hold:                                            # demo lever: force these scopes OUT of the installation authority (an operator who did not enable them)
         inst = Authority(set(inst.scopes) - hold, inst.ceilings, ttl=None)
-    # sub-agents (multi-agent apps): each is delegated the installation authority, meet-narrowed by the chain.
-    delegations = {a.name: inst for a in agents if a is not root_agent}
-    if delegations:
-        inst = Authority(set(inst.scopes) | {f"agent.delegate.{a.name}" for a in agents if a is not root_agent}, inst.ceilings, ttl=None)
+    # sub-agents (multi-agent apps): each requests the installation's grantable scopes + delegate scopes for its OWN
+    # declared descendants; the chain's meet narrows each request to what its parent holds.
+    inst, delegations = delegation_requests(inst, agents, root_agent, subs_by_agent)
     from attenu_derive.product import get_policy
     product_dir_for_policy = identity.find_product_dir()
     heur = bool(product_dir_for_policy) and get_policy(product_dir_for_policy)["unknown_tools"] == "heuristic"

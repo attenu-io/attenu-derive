@@ -93,10 +93,19 @@ def override_models(root, model: str) -> dict:
     if not gemini:
         from google.adk.models.lite_llm import LiteLlm
         llm = LiteLlm(model=model)
+    changed["sampling_fixed"] = []
     for a in walk_agents(root):
         if isinstance(a, LlmAgent):
             a.model = model if gemini else llm; changed["agents"].append(a.name)
             if not gemini:
+                # Anthropic rejects `temperature` AND `top_p` together on current models (Gemini-native apps often set
+                # both); keep temperature, drop top_p (and top_k) so the app runs unchanged otherwise.
+                gcc = getattr(a, "generate_content_config", None)
+                if gcc is not None and (getattr(gcc, "top_p", None) is not None or getattr(gcc, "top_k", None) is not None):
+                    try:
+                        gcc.top_p = None; gcc.top_k = None; changed["sampling_fixed"].append(a.name)
+                    except Exception:  # noqa: BLE001 - frozen config objects: leave as is
+                        pass
                 new_tools = []
                 for t in (a.tools or []):
                     tn = type(t).__name__

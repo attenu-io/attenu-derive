@@ -42,3 +42,18 @@ def test_override_models_routes_the_whole_tree_and_stubs_gemini_only_tools():
     assert tools["data_analyst"] == ["google_search"]                                        # the stub keeps the tool NAME (the call is still recorded)
     root2 = _tree(); ch2 = override_models(root2, "gemini-3.6-flash")
     assert ch2["stubbed_tools"] == [] and all(a.model == "gemini-3.6-flash" for a in walk_agents(root2))
+
+
+def test_override_models_drops_top_p_for_non_gemini_models():
+    """Anthropic (via LiteLLM) rejects temperature+top_p together; Gemini-native apps set both. The override must
+    keep the app runnable on Haiku/Sonnet unchanged otherwise (found live on travel-concierge, 2026-08-19)."""
+    pytest.importorskip("google.adk")
+    from google.adk.agents.llm_agent import LlmAgent
+    from google.genai import types
+    from attenu_derive.sample.run_adk_app import override_models
+    a = LlmAgent(name="a", model="gemini-2.0-flash", description="d", generate_content_config=types.GenerateContentConfig(temperature=0.3, top_p=0.9))
+    ch = override_models(a, "anthropic/claude-haiku-4-5-20251001")
+    assert a.generate_content_config.temperature == 0.3 and a.generate_content_config.top_p is None and ch["sampling_fixed"] == ["a"]
+    b = LlmAgent(name="b", model="gemini-2.0-flash", description="d", generate_content_config=types.GenerateContentConfig(temperature=0.3, top_p=0.9))
+    override_models(b, "gemini-2.0-flash")
+    assert b.generate_content_config.top_p == 0.9                                   # Gemini keeps both
