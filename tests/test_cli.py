@@ -87,3 +87,11 @@ def test_cli_demo_writes_a_chain_into_the_product(tmp_path, monkeypatch, capsys)
     assert main(["demo", "--dir", str(tmp_path / "proj")]) == 0
     out = capsys.readouterr().out
     assert "held_pending_grant" in out and list((tmp_path / "proj" / ".attenu" / "ledger").glob("*/*.jsonl"))
+
+
+def test_cli_sync_on_an_unlinked_product_says_so(tmp_path, monkeypatch, capsys):
+    from attenu_derive.cli import main
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    assert main(["init", "--product", "T", "--dir", str(tmp_path / "proj")]) == 0
+    capsys.readouterr()
+    assert main(["sync", "--dir", str(tmp_path / "proj")]) == 1 and "not linked" in capsys.readouterr().out

@@ -14,6 +14,7 @@ so the operator edits a draft rather than authoring from scratch.
 from __future__ import annotations
 
 import argparse
+import os
 import glob
 import json
 import sys
@@ -143,6 +144,22 @@ def cmd_ui(args) -> int:
     return serve_main(["--dir", args.dir, "--port", str(args.port)] + (["--open"] if args.open else []))
 
 
+def cmd_link(args) -> int:
+    from attenu_derive.cloud import link
+    out = link(Path(args.dir), args.token, base_url=args.url, environment=args.env)
+    print(json.dumps({k: out[k] for k in ("installation_id", "product_id", "environment", "base_url")}, indent=2)); return 0
+
+
+def cmd_sync(args) -> int:
+    import time as _t
+    from attenu_derive.cloud import sync
+    while True:
+        rep = sync(Path(args.dir)); print(json.dumps(rep))
+        if not args.watch:
+            return 0 if rep["skipped_reason"] is None else 1
+        _t.sleep(args.every)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="attenu", description="Attenu day-0 kit + onboarding + offline evidence verify")
     ap.add_argument("--version", action="version", version=f"attenu {__version__}")
@@ -162,6 +179,12 @@ def build_parser() -> argparse.ArgumentParser:
     d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")
     d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, help="seconds between steps (animate a watching UI)")
     d.set_defaults(fn=cmd_demo)
+    lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
+    lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
+    lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://app.attenu.io")); lk.set_defaults(fn=cmd_link)
+    sy = sub.add_parser("sync", help="drain the spool + anchors to the cloud, heartbeat, pull grants (a separate process — never in the deny path)")
+    sy.add_argument("--dir", default="."); sy.add_argument("--watch", action="store_true"); sy.add_argument("--every", type=float, default=10.0)
+    sy.set_defaults(fn=cmd_sync)
     u = sub.add_parser("ui", help="open the local console over this machine's products (needs attenu-console)")
     u.add_argument("--dir", default="."); u.add_argument("--port", type=int, default=8787); u.add_argument("--open", action="store_true")
     u.set_defaults(fn=cmd_ui)
