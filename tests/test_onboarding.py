@@ -36,3 +36,19 @@ def test_deriver_holds_process_payment_until_operator_grants_it():
     assert held.covers_scope("data.read") and not held.covers_scope("payments.transfer")   # money held
     granted, _ = Deriver(domain=ov, operator_grants={"payments.transfer"}).propose(ev)
     assert granted.covers_scope("payments.transfer")                                        # one grant enables it
+
+
+def test_curation_burden_is_bounded_and_frontloaded_on_tier2():
+    """A2c: the curation burden is measured — most of a pack is mechanical, the judgement calls are the tier-2/withheld
+    tools (the ones a bank wants a human on). Pins the metric so it can't silently balloon."""
+    import glob, yaml
+    from pathlib import Path
+    from attenu_derive.catalog.coverage import load_catalog, _classify
+    cat = load_catalog(); tools = judge = 0
+    for f in glob.glob("src/attenu_derive/catalog/domains/*.yaml"):
+        for name, e in (yaml.safe_load(Path(f).read_text()).get("tools") or {}).items():
+            tools += 1
+            if _classify(cat, name) in ("withheld", "unresolved") or e.get("requires_grant"):
+                judge += 1
+    assert tools >= 20
+    assert judge / tools <= 0.5, f"curation judgement burden {judge}/{tools} exceeded 50% — investigate"

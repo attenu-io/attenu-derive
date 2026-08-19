@@ -57,3 +57,33 @@ could run in shadow immediately with zero risk of an unintended payment. Onboard
 `payment_choice` a read (it does not move money), keeps `create_reservation`/`process_payment` as
 `payments.transfer` held pending grant, and resolves `memorize` to internal scratch. After the pack the
 app is 100% curated with the two money tools held — one `--grant payments.transfer` from enforce.
+
+## The loop as one CLI sequence (A2a)
+
+    # 1. shadow: run your app with the observe adapter -> traces.jsonl (nothing blocked)
+    # 2. day-0 report + a draft pack for the gaps:
+    attenu onboard traces.jsonl --domain my-app --scaffold my-app.yaml
+    # 3. EDIT my-app.yaml — the judgement step (see cost below) — then move it into catalog/domains/
+    # 4. verify: attenu coverage traces.jsonl --domain my-app   (expect unresolved 0, tier-2 requires_grant)
+    # 5. enforce with the pack + operator_grants; export evidence with attenu_derive.flywheel.export_for_flywheel
+    # 6. an auditor runs: attenu verify bundle.json --hs256-key <hex>   (integrity/monotonicity/containment)
+
+## Onboarding cost — measured (A2c)
+
+Across the three onboarded apps (retail-support, finance-advisory, travel-planning) — **23 tools total, 7
+(30%) required an operator judgement call**, the other 70% were mechanical confirmations of the scaffold's
+heuristic guess. A "judgement call" = day-0 was withheld or unresolved, or a tier-2 grant decision. Examples:
+
+| app | judgement call | the decision |
+|---|---|---|
+| retail-support | `send_care_instructions`, `send_call_companion_link` | tier-2 `mail.send` — hold as `requires_grant`? **yes** |
+| retail-support | `modify_cart` | heuristic said payments; a cart write is `data.write`, not money — **corrected** |
+| travel-planning | `create_reservation`, `process_payment` | tier-2 `payments.transfer` — hold as `requires_grant`? **yes** |
+| travel-planning | `payment_choice` | lists options, does not move money → `data.read` (not payments) — **judgement** |
+| travel-planning | `memorize` | day-0 unresolved → internal scratch `state.write` — **judgement** |
+
+So the curation burden is **~30% of an app's tools need a human decision, and it is front-loaded on the
+tier-2 / money tools** — exactly the ones a bank wants a human to decide anyway. Day-0 is safe before any of
+it (money withheld, unknowns fail-closed), and the wall-clock is minutes. This is the register's
+"curation-burden scales with customers" risk, now a number rather than a worry: it scales with an app's
+*distinct sensitive tools*, not its traffic, and the scaffold does the mechanical 70%.
