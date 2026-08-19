@@ -136,7 +136,8 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
                 if getattr(part, "function_response", None):
                     resp = part.function_response.response
                     if isinstance(resp, dict) and resp.get("error") == "authority_denied":
-                        denials_in_transcript.append({"tool": part.function_response.name, "scope": resp.get("scope"), "reasons": resp.get("reasons")})
+                        denials_in_transcript.append({"tool": part.function_response.name, "scope": resp.get("scope"), "reasons": resp.get("reasons"),
+                                                      "disposition": resp.get("disposition")})
         return tool_calls, denials_in_transcript
     async def _bounded():
         return await asyncio.wait_for(_go(), timeout=timeout_s)
