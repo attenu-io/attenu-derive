@@ -69,6 +69,16 @@ def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(
     return {name: ToolAuthority(scope, disposition=d) for name, (scope, d) in disp.items()}
 
 
+def effective_grants(cli_grants: set[str], product_dir) -> set[str]:
+    """CLI `--grant`s plus the product's operator grants (`.attenu/grants.json`, written by the console's
+    Decisions screen) — so a grant decided in the console reaches the live runner without a flag."""
+    g = set(cli_grants or ())
+    if product_dir is not None:
+        from attenu_derive.product import load_grants
+        g |= load_grants(product_dir)
+    return g
+
+
 def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float, hold: set[str] | None = None):
     import asyncio
     from google.adk.agents.run_config import RunConfig
@@ -79,6 +89,7 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     from delegation_guard.adapters.google_adk import DelegationGuardPlugin
 
     domain = load_domain(domain_name)
+    grants = effective_grants(grants, identity.find_product_dir())
     root_agent = load_root_agent(app_dir)
     changed = override_models(root_agent, model)
     agents = walk_agents(root_agent)

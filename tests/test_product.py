@@ -25,3 +25,12 @@ def test_two_products_on_one_machine_are_distinct_without_any_key(tmp_path, monk
     assert a["product_id"] != b["product_id"] and len(product.registry_list()) == 2
     product.init_product(tmp_path / "a", "A renamed")                             # re-init the same dir: one registry row, not two
     assert len(product.registry_list()) == 2
+
+
+def test_grants_file_round_trip(tmp_path, monkeypatch):
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    product.init_product(tmp_path / "proj", "T")
+    assert product.load_grants(tmp_path / "proj") == set()
+    assert product.add_grant(tmp_path / "proj", "payments.transfer") == {"payments.transfer"}
+    assert product.add_grant(tmp_path / "proj", "payments.transfer") == {"payments.transfer"}     # idempotent
+    assert product.load_grants(tmp_path / "proj") == {"payments.transfer"}

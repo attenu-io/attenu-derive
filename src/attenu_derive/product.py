@@ -17,7 +17,7 @@ from pathlib import Path
 from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
-           "load_anchor_signer", "load_anchor_verifier"]
+           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -79,3 +79,21 @@ def load_anchor_signer(product_dir: Path) -> Ed25519Signer:
 def load_anchor_verifier(product_dir: Path) -> Ed25519Verifier:
     meta = load_product_json(product_dir)
     return Ed25519Verifier(bytes.fromhex(meta["anchor_pub"]), kid=meta["anchor_kid"])
+
+
+# ---- operator grants (the console's "Grant scope" decision lands here; the runners read it) -------------------
+def grants_path(product_dir: Path) -> Path:
+    return Path(product_dir) / ".attenu" / "grants.json"
+
+
+def load_grants(product_dir: Path) -> set[str]:
+    p = grants_path(product_dir)
+    return set(json.loads(p.read_text()).get("operator_grants", [])) if p.exists() else set()
+
+
+def add_grant(product_dir: Path, scope: str) -> set[str]:
+    """Idempotently record an operator grant for `scope`; returns the full set. One flip, one file."""
+    g = load_grants(product_dir); g.add(scope)
+    p = grants_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"operator_grants": sorted(g)}, indent=2))
+    return g

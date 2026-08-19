@@ -127,6 +127,22 @@ def cmd_products(args) -> int:
     return 0
 
 
+def cmd_demo(args) -> int:
+    from attenu_derive.sample.demo_local import run_demo
+    rep = run_demo(Path(args.dir), slow=args.slow)
+    print(json.dumps({k: rep[k] for k in ("chain_id", "ledger_path", "bundle_path", "anchor_kid", "grants",
+                                           "child_scopes", "narrower_than_root", "denials_view")}, indent=2))
+    return 0
+
+
+def cmd_ui(args) -> int:
+    try:
+        from attenu_console.cli import serve_main
+    except ImportError:
+        print("attenu ui needs the console package: pip install attenu-console", file=sys.stderr); return 2
+    return serve_main(["--dir", args.dir, "--port", str(args.port)] + (["--open"] if args.open else []))
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="attenu", description="Attenu day-0 kit + onboarding + offline evidence verify")
     ap.add_argument("--version", action="version", version=f"attenu {__version__}")
@@ -143,6 +159,12 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--product", required=True); i.add_argument("--env", default="dev"); i.add_argument("--dir", default=".")
     i.set_defaults(fn=cmd_init)
     pr = sub.add_parser("products", help="products known on this machine"); pr.set_defaults(fn=cmd_products)
+    d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")
+    d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, help="seconds between steps (animate a watching UI)")
+    d.set_defaults(fn=cmd_demo)
+    u = sub.add_parser("ui", help="open the local console over this machine's products (needs attenu-console)")
+    u.add_argument("--dir", default="."); u.add_argument("--port", type=int, default=8787); u.add_argument("--open", action="store_true")
+    u.set_defaults(fn=cmd_ui)
     return ap
 
 

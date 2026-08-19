@@ -65,3 +65,25 @@ def test_cli_verify_with_a_public_key(tmp_path, monkeypatch, capsys):
     assert main(["verify", str(tmp_path / "b.json"), "--pubkey", meta["anchor_pub"], "--kid", meta["anchor_kid"]]) == 0
     bundle["entries"][-1]["tool"] = "tampered"; (tmp_path / "b2.json").write_text(json.dumps(bundle))
     assert main(["verify", str(tmp_path / "b2.json"), "--pubkey", meta["anchor_pub"], "--kid", meta["anchor_kid"]]) == 1
+
+
+def test_cli_ui_without_console_installed_says_how_to_get_it(monkeypatch, capsys):
+    import builtins
+    from attenu_derive.cli import main
+    real = builtins.__import__
+    def fake(name, *a, **k):
+        if name.startswith("attenu_console"):
+            raise ImportError("nope")
+        return real(name, *a, **k)
+    monkeypatch.setattr(builtins, "__import__", fake)
+    assert main(["ui"]) == 2 and "attenu-console" in capsys.readouterr().err
+
+
+def test_cli_demo_writes_a_chain_into_the_product(tmp_path, monkeypatch, capsys):
+    from attenu_derive.cli import main
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    assert main(["init", "--product", "Travel Demo", "--dir", str(tmp_path / "proj")]) == 0
+    capsys.readouterr()
+    assert main(["demo", "--dir", str(tmp_path / "proj")]) == 0
+    out = capsys.readouterr().out
+    assert "held_pending_grant" in out and list((tmp_path / "proj" / ".attenu" / "ledger").glob("*/*.jsonl"))
