@@ -34,6 +34,10 @@ committed gold + the local corpus (mirrored to the private bucket).*
   generalises) is settled; L3 stays deferred until a real gap appears.
 - **All sampling is Haiku-class** except the two live Sonnet enforce runs. Ceilings derived from Haiku
   over-exploration may be looser than a frontier model needs (a small frontier calibration slice is planned).
+- **The onboarding wall-clock was measured by the builder, not a naive operator.** The ≤1h / ~minutes figure
+  (G4/G5) inherits expert bias: I knew the vocabulary and the tools. A genuinely naive onboarding — the true
+  G4 number — is a design-partner activity that solo work cannot manufacture. The judgement points are real;
+  the *time* is a floor, not a representative user's.
 
 ## Summary
 
@@ -95,6 +99,12 @@ alone: all payment tools withheld, unknowns fail-closed, reads granted heuristic
 zero unintended-payment risk. Curation then takes it to 100% with money tools held pending an operator
 grant. `docs/ONBOARDING.md`; `tests/test_onboarding.py`. Out-of-sample catalog coverage on public datasets
 the catalog never saw is the corroborating number (BFCL/hermes/ToolACE, `catalog.coverage`).
+
+**Operating cost (measured, A2c):** across the 3 onboarded apps, **23 tools, 7 (30%) required an operator
+judgement call**, 70% mechanical scaffold confirmations. The judgement calls are front-loaded on the tier-2
+tools a bank *wants* a human deciding (payments, mail held `requires_grant`), so the curation burden scales
+with an app's **distinct sensitive tools, not its traffic**, and day-0 is safe before any of it. Pinned ≤50%
+by a test (`tests/test_onboarding.py`).
 
 ## Reproduce everything
 
