@@ -1,0 +1,7 @@
+# Domain pack — travel booking (A3). Curated for the CrewAI + LangGraph customer-domain enforce runs.
+domain: travel-booking
+version: 1
+tools:
+  search_flights: {scope: data.read, consumes: {}, tier: 0}
+  get_weather:    {scope: data.read, consumes: {}, tier: 0}
+  book_flight:    {scope: payments.transfer, consumes: {amount: spend}, tier: 2, requires_grant: true}

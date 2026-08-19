@@ -13,10 +13,13 @@ committed gold + the local corpus (mirrored to the private bucket).*
   2,000 was always a proxy for corpus richness bought from ourselves; the flywheel (customer-exported bundles,
   never background telemetry) supplies real volume once a design partner runs the loop. "Deferred to
   real-customer data", not "not met". The 25%-non-code G3 amendment is parked with it.
-- **Every customer-domain app measured is Google ADK.** customer-service and financial-advisor are both ADK
-  on Haiku/Sonnet via LiteLLM. Framework diversity exists in the *code*-repo corpus (4 frameworks) but not in
-  the customer-domain slice. The CrewAI/LangChain/Claude-SDK adapters are tested, but not on a customer-domain
-  *app*.
+- **Customer-domain *enforcement* is now shown on three frameworks (A3); customer-domain *observe-sampling*
+  is ADK-only.** customer-service + financial-advisor were observed/scored on ADK; **CrewAI and LangGraph are
+  additionally enforced live on a customer-domain (travel-booking) workload** — real delegation, a held
+  `payments.transfer` denied live, offline-verifiable, no divergence (`docs/A3-FRAMEWORKS.md`). Bound that
+  remains: those two are *configured* crews/graphs, not scraped third-party apps (crewAI-examples target an
+  old API; LangGraph apps are heterogeneous) — a real third-party customer-domain app on a non-ADK framework
+  is a design-partner activity. G1/G5 *derivation-quality* numbers remain ADK-observed.
 - **The G1 hold-out over-provision metric rests on 13 clean rows.** The express hold-out has 43 rows but only
   13 survive the truncated/degenerate exclusion; the unused-scope and over-provision figures are computed on
   those 13. Small sample.
