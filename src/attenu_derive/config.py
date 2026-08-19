@@ -105,8 +105,17 @@ def set_ceiling(product_dir: Path, max_scopes) -> list[str]:
 
 
 def _materialize(product_dir: Path, rev: dict) -> None:
+    """grants.json holds what THIS installation's runners read: plain grants + the ones tagged for its environment
+    (`scope@env`), tag stripped. The revision keeps the full tagged truth."""
+    from attenu_derive.product import load_product_json
     att = Path(product_dir) / ".attenu"
-    (att / "grants.json").write_text(json.dumps({"operator_grants": sorted(rev["grants"])}, indent=2))
+    my_env = (load_product_json(product_dir) or {}).get("environment")
+    mine = set()
+    for g in rev["grants"]:
+        scope, _, env = g.partition("@")
+        if not env or env == my_env:
+            mine.add(scope)
+    (att / "grants.json").write_text(json.dumps({"operator_grants": sorted(mine)}, indent=2))
     (att / "pack.json").write_text(json.dumps({"tools": rev["declared_tools"], "policy": rev["policy"]}, indent=2))
 
 
@@ -123,7 +132,7 @@ def apply_revision(product_dir: Path, rev: dict) -> dict:
         raise RevisionError(f"revision conflict: rev {rev.get('rev')} does not extend local HEAD rev {cur['rev']} — keeping last-known-good; resolve in the console")
     ceiling = get_ceiling(product_dir)
     if ceiling is not None:
-        over = sorted(set(rev.get("grants", [])) - set(ceiling))
+        over = sorted({g.partition("@")[0] for g in rev.get("grants", [])} - set(ceiling))   # the ceiling caps the SCOPE, any env
         if over:
             raise RevisionError(f"revision grants {over} exceed the ceiling {ceiling} — refused")
     d = _dir(product_dir); d.mkdir(parents=True, exist_ok=True)

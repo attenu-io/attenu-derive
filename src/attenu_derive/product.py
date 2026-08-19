@@ -18,7 +18,7 @@ from pathlib import Path
 from delegation_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
-           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "remove_grant", "note_run", "run_meta",
+           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "remove_grant", "grant_key", "note_run", "run_meta",
            "pack_path", "load_pack", "declare_tool", "effective_domain", "get_policy", "set_policy", "POLICY_DEFAULTS", "POLICY_CHOICES"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -124,25 +124,34 @@ def load_grants(product_dir: Path) -> set[str]:
     return set(json.loads(p.read_text()).get("operator_grants", [])) if p.exists() else set()
 
 
-def add_grant(product_dir: Path, scope: str, *, by: str | None = None) -> set[str]:
+def grant_key(scope: str, env: str | None) -> str:
+    """A grant entry in the signed revision: plain `scope` = every environment; `scope@env` = that environment only.
+    A string convention on the unchanged revision schema — old verifiers keep verifying."""
+    return scope if not env else f"{scope}@{env}"
+
+
+def add_grant(product_dir: Path, scope: str, *, by: str | None = None, env: str | None = None) -> set[str]:
     """Idempotently record an operator grant for `scope` — as a SIGNED config revision (see attenu_derive.config);
-    refused if it exceeds the product's ceiling. Returns the full set. One flip, one revision."""
+    refused if it exceeds the product's ceiling. `env` scopes the grant to one environment (None = all).
+    Returns the set THIS installation's runners read. One flip, one revision."""
     from attenu_derive import config as _cfg
-    g = load_grants(product_dir)
-    if scope in g:
-        return g
-    _cfg.commit(product_dir, grants=sorted(g | {scope}), by=by)
+    key = grant_key(scope, env)
+    g = set(_cfg.head(product_dir)["grants"])                             # the signed truth, unfiltered
+    if key in g:
+        return load_grants(product_dir)
+    _cfg.commit(product_dir, grants=sorted(g | {key}), by=by)
     return load_grants(product_dir)
 
 
-def remove_grant(product_dir: Path, scope: str, *, by: str | None = None) -> set[str]:
+def remove_grant(product_dir: Path, scope: str, *, by: str | None = None, env: str | None = None) -> set[str]:
     """The revert of add_grant — a SIGNED revision that removes the grant (the diff shows `- revoked grant`), so the
     runners stop seeing the scope on their next pull. Idempotent: removing what was never granted commits nothing."""
     from attenu_derive import config as _cfg
-    g = load_grants(product_dir)
-    if scope not in g:
-        return g
-    _cfg.commit(product_dir, grants=sorted(g - {scope}), by=by)
+    key = grant_key(scope, env)
+    g = set(_cfg.head(product_dir)["grants"])
+    if key not in g:
+        return load_grants(product_dir)
+    _cfg.commit(product_dir, grants=sorted(g - {key}), by=by)
     return load_grants(product_dir)
 
 

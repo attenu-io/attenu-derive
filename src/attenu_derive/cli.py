@@ -186,6 +186,22 @@ def cmd_ceiling(args) -> int:
     print(json.dumps({"ceiling": cfg.get_ceiling(Path(args.dir))}, indent=2)); return 0
 
 
+def cmd_grant(args) -> int:
+    """Operator grants from the terminal — same signed revisions as the console. `--env` scopes to one environment."""
+    from attenu_derive import config as cfg
+    from attenu_derive.product import add_grant, remove_grant
+    d = Path(args.dir)
+    try:
+        if args.remove:
+            remove_grant(d, args.scope, env=args.env, by=args.by)
+        else:
+            add_grant(d, args.scope, env=args.env, by=args.by)
+    except cfg.RevisionError as exc:
+        print(f"refused: {exc}", file=sys.stderr); return 2
+    head = cfg.head(d)
+    print(json.dumps({"rev": head["rev"], "grants": head["grants"]}, indent=2)); return 0
+
+
 def cmd_report(args) -> int:
     from attenu_derive import report
     d = Path(args.dir); ev = d / ".attenu" / "evidence"; written = []
@@ -224,6 +240,9 @@ def build_parser() -> argparse.ArgumentParser:
     po.set_defaults(fn=cmd_policy)
     cf = sub.add_parser("config", help="the product's signed config revisions (grants, declared tools, policy): log + diffs")
     cf.add_argument("--dir", default="."); cf.set_defaults(fn=cmd_config)
+    g = sub.add_parser("grant", help="grant / revoke an operator scope as a signed revision; --env scopes it to one environment")
+    g.add_argument("scope"); g.add_argument("--env", default=None); g.add_argument("--remove", action="store_true")
+    g.add_argument("--by", default=None); g.add_argument("--dir", default="."); g.set_defaults(fn=cmd_grant)
     ce = sub.add_parser("ceiling", help="show / set the ceiling: the scopes this product may EVER be granted (a revision beyond it is refused)")
     ce.add_argument("--dir", default="."); ce.add_argument("--set", nargs="*", default=None, metavar="SCOPE"); ce.set_defaults(fn=cmd_ceiling)
     rp = sub.add_parser("report", help="write printable evidence reports (HTML) for this product's chains + a product summary (print -> PDF)")

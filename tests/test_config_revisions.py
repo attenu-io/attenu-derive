@@ -108,3 +108,21 @@ def test_remove_grant_is_a_signed_revision_and_the_runners_stop_seeing_the_scope
     assert cfg.verify_revision(proj, log[-1])
     assert product.remove_grant(proj, "never.granted") == {"mail.send"}                      # no-op, no new revision
     assert cfg.head(proj)["rev"] == log[-1]["rev"]
+
+
+def test_environment_scoped_grants_materialize_only_in_their_environment(proj):
+    """Env-scoped grants: 'scope@env' entries in the (unchanged) revision schema apply only where they were meant —
+    a grant for prod never widens a dev installation, and the ceiling is checked on the SCOPE part."""
+    meta = product.load_product_json(proj)
+    assert meta["environment"] == "dev"
+    product.add_grant(proj, "data.write")                                                     # global: everywhere
+    product.add_grant(proj, "payments.transfer", env="prod")                                  # prod only
+    product.add_grant(proj, "mail.send", env="dev")                                           # this env
+    assert cfg.head(proj)["grants"] == ["data.write", "mail.send@dev", "payments.transfer@prod"]   # the signed truth
+    assert product.load_grants(proj) == {"data.write", "mail.send"}                           # what THIS runner reads
+    # the ceiling caps the scope regardless of environment tag
+    cfg.set_ceiling(proj, ["data.write", "mail.send", "payments.transfer"])
+    with pytest.raises(cfg.RevisionError):
+        product.add_grant(proj, "payments.refund", env="prod")                                # refused over the ceiling
+    assert "payments.refund@prod" not in cfg.head(proj)["grants"]
+    assert product.remove_grant(proj, "mail.send", env="dev") == {"data.write"}               # revert respects the tag
