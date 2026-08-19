@@ -16,6 +16,7 @@ dependencies = ["delegation-guard>=0.3", "pyyaml>=6"]     # the enforcement shim
 attenu = "attenu_derive.cli:main"
 
 [project.optional-dependencies]
+kms = ["boto3>=1.34"]
 retrieval = []          # ADR-08: heavy retrieval deps stay behind an extra (chosen in P2)
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.50"]     # OpenAI-compatible incl. Azure/Bedrock gateways

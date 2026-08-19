@@ -48,8 +48,9 @@ def build_revision(*, parent: dict | None, grants, declared_tools: dict, policy:
             "grants": sorted(set(grants or ())), "declared_tools": dict(declared_tools or {}), "policy": dict(policy or {})}
 
 
-def sign_revision(rev: dict, *, private_hex: str, kid: str) -> dict:
-    signer = Ed25519Signer.from_private_bytes(bytes.fromhex(private_hex), kid=kid)
+def sign_revision(rev: dict, *, private_hex: str | None = None, kid: str, signer=None) -> dict:
+    """Sign with a raw Ed25519 private key (hex) or with any `Signer` object (e.g. a KMS signer)."""
+    signer = signer or Ed25519Signer.from_private_bytes(bytes.fromhex(private_hex), kid=kid)
     body = {k: v for k, v in rev.items() if k != "sig"}; body["signer_kid"] = kid
     body["sig"] = signer.sign(_canonical(body)).hex()
     return body
@@ -71,7 +72,11 @@ def verify_revision(product_dir: Path, rev: dict) -> bool:
     if not pub or not rev.get("sig"):
         return False
     try:
-        return Ed25519Verifier(bytes.fromhex(pub), kid=kid).verify(_canonical(rev), bytes.fromhex(rev["sig"]))
+        from attenu_derive.product import load_anchor_verifier, load_product_json
+        meta = load_product_json(product_dir)
+        if kid == meta.get("anchor_kid"):
+            return load_anchor_verifier(product_dir).verify(_canonical(rev), bytes.fromhex(rev["sig"]))   # Ed25519 or ES256 (KMS)
+        return Ed25519Verifier(bytes.fromhex(pub), kid=kid).verify(_canonical(rev), bytes.fromhex(rev["sig"]))   # the Attenu signer
     except Exception:  # noqa: BLE001
         return False
 
@@ -136,7 +141,7 @@ def commit(product_dir: Path, *, grants=None, declared_tools=None, policy=None, 
                          declared_tools=cur["declared_tools"] if declared_tools is None else declared_tools,
                          policy=cur["policy"] if policy is None else policy, by=by)
     meta = load_product_json(product_dir); signer = load_anchor_signer(product_dir)
-    signed = sign_revision(rev, private_hex=signer.private_bytes_raw().hex(), kid=meta["anchor_kid"])
+    signed = sign_revision(rev, kid=meta["anchor_kid"], signer=signer)
     return apply_revision(product_dir, signed)
 
 
@@ -152,7 +157,7 @@ def ensure_initialized(product_dir: Path) -> None:
     policy = {**POLICY_DEFAULTS, **(pack.get("policy") or {})}
     rev = build_revision(parent=None, grants=grants, declared_tools=pack.get("tools") or {}, policy=policy, by="init")
     meta = load_product_json(product_dir); signer = load_anchor_signer(product_dir)
-    signed = sign_revision(rev, private_hex=signer.private_bytes_raw().hex(), kid=meta["anchor_kid"])
+    signed = sign_revision(rev, kid=meta["anchor_kid"], signer=signer)
     d.mkdir(parents=True, exist_ok=True)
     (d / "0.json").write_text(json.dumps(signed, indent=2)); (d / "HEAD").write_text("0")
     _materialize(product_dir, signed)

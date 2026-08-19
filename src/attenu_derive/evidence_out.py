@@ -15,7 +15,7 @@ from pathlib import Path
 from delegation_guard import AuditLog, evidence, identity
 from delegation_guard.wire import HS256TestSigner
 
-__all__ = ["write_evidence", "effective_grants", "product_meta"]
+__all__ = ["write_evidence", "effective_grants", "product_meta", "AnchorScheduler"]
 
 
 def product_meta(product_dir) -> dict:
@@ -54,3 +54,41 @@ def write_evidence(root_guard, product_dir) -> dict:
             "anchor_kid": anchor.get("kid"), "ledger_path": str(log.path) if log.path else None, "bundle_path": bundle_path,
             "evidence_bundle_offline_verify": bundle_check, "delegation_graph_view": evidence.delegation_graph(bundle),
             "denials_view": evidence.denials(bundle)}
+
+
+class AnchorScheduler:
+    """Out-of-band anchoring for long-running apps (console design §7): a timer thread calls `write_evidence`
+    every `every_s` seconds and once more on stop — never inside the ledger's append path, so a slow KMS or a full
+    disk can delay an anchor but can never touch enforcement. Use as a context manager around the run.
+
+        with AnchorScheduler(root_guard, product_dir, every_s=30):
+            ... run the app ...
+    """
+
+    def __init__(self, root_guard, product_dir, *, every_s: float = 30.0):
+        import threading
+        self._guard = root_guard; self._dir = product_dir; self._every = every_s
+        self._stop = threading.Event(); self._thread = threading.Thread(target=self._loop, name="attenu-anchor", daemon=True)
+        self.anchors = 0; self.last = None; self.errors = 0
+
+    def _tick(self) -> None:
+        try:
+            self.last = write_evidence(self._guard, self._dir); self.anchors += 1
+        except Exception:  # noqa: BLE001 - anchoring failures are counted, never raised into the app
+            self.errors += 1
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._every):
+            self._tick()
+
+    def start(self) -> "AnchorScheduler":
+        self._thread.start(); return self
+
+    def stop(self) -> None:
+        self._stop.set(); self._thread.join(timeout=max(1.0, self._every * 2)); self._tick()    # final anchor covers everything
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, *exc):
+        self.stop()

@@ -112,9 +112,9 @@ def cmd_verify(args) -> int:
 
 def cmd_init(args) -> int:
     from attenu_derive import product
-    meta = product.init_product(Path(args.dir), args.product, args.env)
+    meta = product.init_product(Path(args.dir), args.product, args.env, anchor=args.anchor, kms_key_id=args.kms_key_id, kms_region=args.kms_region)
     print(json.dumps({"product_dir": str(Path(args.dir).resolve()),
-                      **{k: meta[k] for k in ("product_id", "name", "environment", "anchor_kid")}}, indent=2))
+                      **{k: meta.get(k) for k in ("product_id", "name", "environment", "anchor_kind", "anchor_kid")}}, indent=2))
     return 0
 
 
@@ -211,6 +211,8 @@ def build_parser() -> argparse.ArgumentParser:
     v.set_defaults(fn=cmd_verify)
     i = sub.add_parser("init", help="give this directory a product identity + a local anchor key (no cloud, no token)")
     i.add_argument("--product", required=True); i.add_argument("--env", default="dev"); i.add_argument("--dir", default=".")
+    i.add_argument("--anchor", choices=["local", "kms"], default="local", help="anchor key custody: local Ed25519 key file (default) or a cloud KMS key (never leaves the HSM)")
+    i.add_argument("--kms-key-id", default=None); i.add_argument("--kms-region", default=None)
     i.set_defaults(fn=cmd_init)
     pr = sub.add_parser("products", help="products known on this machine"); pr.set_defaults(fn=cmd_products)
     d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")

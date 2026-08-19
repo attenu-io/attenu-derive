@@ -8,13 +8,14 @@ local console can offer a product switcher. No key, no network, no derivation he
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
 import time
 from pathlib import Path
 
-from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
+from delegation_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
            "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta",
@@ -51,17 +52,39 @@ def registry_add(product_dir: Path, meta: dict) -> None:
     p.write_text(json.dumps({"products": items}, indent=2))
 
 
-def init_product(product_dir: Path, name: str, environment: str = "dev") -> dict:
-    """Create (or re-create) a product identity in `product_dir`: product.json + a fresh anchor keypair."""
+def _kms_client(region: str | None = None):
+    from attenu_derive.signers import kms_client
+    return kms_client(region)
+
+
+def init_product(product_dir: Path, name: str, environment: str = "dev", *, anchor: str = "local",
+                 kms_key_id: str | None = None, kms_region: str | None = None) -> dict:
+    """Create (or re-create) a product identity in `product_dir`: product.json + the anchor key custody of choice —
+    `local` (a fresh Ed25519 keypair, private half in .attenu/keys/anchor.key, 0600) or `kms` (the key stays in a cloud
+    KMS; only its SPKI public key is recorded — nothing private ever touches disk)."""
     product_dir = Path(product_dir); att = product_dir / ".attenu"
     (att / "keys").mkdir(parents=True, exist_ok=True)
     existing = load_product_json(product_dir) if (att / "product.json").exists() else None
-    signer = Ed25519Signer.generate(kid=f"anchor-{secrets.token_hex(4)}")
-    key = att / "keys" / "anchor.key"
-    key.write_text(signer.private_bytes_raw().hex()); os.chmod(key, 0o600)
-    meta = {"product_id": (existing or {}).get("product_id") or _ulid(),   # re-init keeps the identity, rotates the key
-            "name": name, "environment": environment, "created": (existing or {}).get("created") or int(time.time()),
-            "anchor_kid": signer.kid, "anchor_pub": signer.public_bytes_raw().hex()}
+    base = {"product_id": (existing or {}).get("product_id") or _ulid(),   # re-init keeps the identity, rotates the key
+            "name": name, "environment": environment, "created": (existing or {}).get("created") or int(time.time())}
+    if anchor == "kms":
+        if not kms_key_id:
+            raise ValueError("anchor='kms' needs kms_key_id")
+        from attenu_derive.signers import KMSSigner
+        kid = f"kms-{hashlib.sha256(kms_key_id.encode()).hexdigest()[:8]}"
+        signer = KMSSigner(_kms_client(kms_region), key_id=kms_key_id, kid=kid)
+        key = att / "keys" / "anchor.key"
+        if key.exists():
+            key.unlink()                                              # switching to KMS: no private key on disk, ever
+        meta = {**base, "anchor_kind": "kms", "anchor_alg": "ES256", "anchor_kid": kid, "anchor_pub": signer.public_spki_der().hex(),
+                "kms_key_id": kms_key_id, **({"kms_region": kms_region} if kms_region else {})}
+    elif anchor == "local":
+        signer = Ed25519Signer.generate(kid=f"anchor-{secrets.token_hex(4)}")
+        key = att / "keys" / "anchor.key"
+        key.write_text(signer.private_bytes_raw().hex()); os.chmod(key, 0o600)
+        meta = {**base, "anchor_kind": "local", "anchor_alg": "EdDSA", "anchor_kid": signer.kid, "anchor_pub": signer.public_bytes_raw().hex()}
+    else:
+        raise ValueError("anchor must be 'local' or 'kms'")
     (att / "product.json").write_text(json.dumps(meta, indent=2))
     registry_add(product_dir, meta)
     from attenu_derive import config as _cfg
@@ -74,14 +97,20 @@ def load_product_json(product_dir: Path) -> dict:
     return json.loads((Path(product_dir) / ".attenu" / "product.json").read_text())
 
 
-def load_anchor_signer(product_dir: Path) -> Ed25519Signer:
+def load_anchor_signer(product_dir: Path):
     meta = load_product_json(product_dir)
+    if meta.get("anchor_kind") == "kms":
+        from attenu_derive.signers import KMSSigner
+        return KMSSigner(_kms_client(meta.get("kms_region")), key_id=meta["kms_key_id"], kid=meta["anchor_kid"])
     raw = bytes.fromhex((Path(product_dir) / ".attenu" / "keys" / "anchor.key").read_text().strip())
     return Ed25519Signer.from_private_bytes(raw, kid=meta["anchor_kid"])
 
 
-def load_anchor_verifier(product_dir: Path) -> Ed25519Verifier:
+def load_anchor_verifier(product_dir: Path):
+    """Public-key-only verifier for the product's anchors — Ed25519 for local keys, ECDSA P-256 (ES256) for KMS."""
     meta = load_product_json(product_dir)
+    if meta.get("anchor_kind") == "kms" or meta.get("anchor_alg") == "ES256":
+        return ECDSAP256Verifier(bytes.fromhex(meta["anchor_pub"]), kid=meta["anchor_kid"])
     return Ed25519Verifier(bytes.fromhex(meta["anchor_pub"]), kid=meta["anchor_kid"])
 
 
