@@ -25,7 +25,7 @@ from delegation_guard.sinks import SpoolSink
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
-from attenu_derive.product import load_grants
+from attenu_derive.product import load_grants, note_run
 from attenu_derive.evidence_out import write_evidence
 
 PLANNER = "travel_planner"
@@ -44,6 +44,7 @@ def run_demo(product_dir: Path, *, slow: float = 0.0, grants: set[str] | None = 
     inst = Authority(inst_scopes, [RowLimit(1_000_000), EgressRank("any")], ttl=None)
 
     chain_id = identity.new_chain_id("demo")
+    note_run(product_dir, identity.boot_id(), framework="demo (scripted)", mode="enforce")
     root = Guard.issue(PLANNER, inst, task="Plan a 3-day trip to Lisbon and book the cheapest flight",
                        chain_id=chain_id, audit_path=identity.ledger_path(product_dir, chain_id),
                        audit_sinks=(SpoolSink(identity.spool_path(product_dir)),))

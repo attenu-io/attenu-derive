@@ -17,7 +17,7 @@ from pathlib import Path
 from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
-           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant"]
+           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -97,3 +97,14 @@ def add_grant(product_dir: Path, scope: str) -> set[str]:
     p = grants_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"operator_grants": sorted(g)}, indent=2))
     return g
+
+
+# ---- per-process run metadata (what a heartbeat says about an app process: framework, mode) -------------------
+def note_run(product_dir: Path, boot_id: str, *, framework: str | None, mode: str | None) -> None:
+    d = Path(product_dir) / ".attenu" / "runs"; d.mkdir(parents=True, exist_ok=True)
+    (d / f"{boot_id}.json").write_text(json.dumps({"framework": framework, "mode": mode, "started": int(time.time())}))
+
+
+def run_meta(product_dir: Path, boot_id: str) -> dict:
+    p = Path(product_dir) / ".attenu" / "runs" / f"{boot_id}.json"
+    return json.loads(p.read_text()) if p.exists() else {}

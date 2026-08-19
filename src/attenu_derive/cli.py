@@ -147,7 +147,7 @@ def cmd_ui(args) -> int:
 def cmd_link(args) -> int:
     from attenu_derive.cloud import link
     out = link(Path(args.dir), args.token, base_url=args.url, environment=args.env)
-    print(json.dumps({k: out[k] for k in ("installation_id", "product_id", "environment", "base_url")}, indent=2)); return 0
+    print(json.dumps({k: out[k] for k in ("product_id", "environment", "base_url")}, indent=2)); return 0
 
 
 def cmd_sync(args) -> int:

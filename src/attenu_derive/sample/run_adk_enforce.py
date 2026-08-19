@@ -106,6 +106,8 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     issue_kwargs = {}
     if product_dir is not None:
         from delegation_guard.sinks import SpoolSink
+        from attenu_derive.product import note_run
+        note_run(product_dir, identity.boot_id(), framework="google-adk", mode="enforce")
         issue_kwargs = {"chain_id": chain_id, "audit_path": identity.ledger_path(product_dir, chain_id),
                         "audit_sinks": (SpoolSink(identity.spool_path(product_dir)),)}
     root_guard = Guard.issue(root_agent.name, inst, task=prompt[:60], **issue_kwargs)
