@@ -64,6 +64,9 @@ def init_product(product_dir: Path, name: str, environment: str = "dev") -> dict
             "anchor_kid": signer.kid, "anchor_pub": signer.public_bytes_raw().hex()}
     (att / "product.json").write_text(json.dumps(meta, indent=2))
     registry_add(product_dir, meta)
+    from attenu_derive import config as _cfg
+    if existing is None or not (att / "config" / "HEAD").exists():
+        _cfg.ensure_initialized(product_dir)                       # revision 0, signed by the product key
     return meta
 
 
@@ -92,12 +95,15 @@ def load_grants(product_dir: Path) -> set[str]:
     return set(json.loads(p.read_text()).get("operator_grants", [])) if p.exists() else set()
 
 
-def add_grant(product_dir: Path, scope: str) -> set[str]:
-    """Idempotently record an operator grant for `scope`; returns the full set. One flip, one file."""
-    g = load_grants(product_dir); g.add(scope)
-    p = grants_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"operator_grants": sorted(g)}, indent=2))
-    return g
+def add_grant(product_dir: Path, scope: str, *, by: str | None = None) -> set[str]:
+    """Idempotently record an operator grant for `scope` — as a SIGNED config revision (see attenu_derive.config);
+    refused if it exceeds the product's ceiling. Returns the full set. One flip, one revision."""
+    from attenu_derive import config as _cfg
+    g = load_grants(product_dir)
+    if scope in g:
+        return g
+    _cfg.commit(product_dir, grants=sorted(g | {scope}), by=by)
+    return load_grants(product_dir)
 
 
 # ---- per-process run metadata (what a heartbeat says about an app process: framework, mode) -------------------
@@ -135,9 +141,9 @@ def declare_tool(product_dir: Path, tool: str, *, scope: str, tier: int = 0, req
     entry: dict = {"scope": scope, "tier": int(tier)}
     if tier == 2 and requires_grant is not False:
         entry["requires_grant"] = True
-    pack = load_pack(product_dir); pack.setdefault("tools", {})[tool] = entry
-    p = pack_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(pack, indent=2))
+    from attenu_derive import config as _cfg
+    tools = dict(load_pack(product_dir).get("tools") or {}); tools[tool] = entry
+    _cfg.commit(product_dir, declared_tools=tools)
     return entry
 
 
@@ -170,6 +176,7 @@ def set_policy(product_dir: Path, key: str, value: str) -> dict:
         raise ValueError(f"unknown policy {key!r}; known: {sorted(POLICY_CHOICES)}")
     if value not in POLICY_CHOICES[key]:
         raise ValueError(f"{key} must be one of {POLICY_CHOICES[key]} (got {value!r})")
-    pack = load_pack(product_dir); pack.setdefault("tools", {}); pack.setdefault("policy", {})[key] = value
-    p = pack_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(json.dumps(pack, indent=2))
+    from attenu_derive import config as _cfg
+    pol = get_policy(product_dir); pol[key] = value
+    _cfg.commit(product_dir, policy=pol)
     return get_policy(product_dir)

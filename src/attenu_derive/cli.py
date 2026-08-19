@@ -170,6 +170,22 @@ def cmd_policy(args) -> int:
     return 0
 
 
+def cmd_config(args) -> int:
+    from attenu_derive import config as cfg
+    log = cfg.log(Path(args.dir))
+    out = [{"rev": r["rev"], "by": r["by"], "created": r["created"], "signer_kid": r["signer_kid"], "verified": cfg.verify_revision(Path(args.dir), r),
+            "grants": r["grants"], "declared_tools": sorted(r["declared_tools"]), "policy": r["policy"],
+            **({"diff": cfg.diff(log[i - 1], r)} if i > 0 else {})} for i, r in enumerate(log)]
+    print(json.dumps({"head": log[-1]["rev"], "ceiling": cfg.get_ceiling(Path(args.dir)), "revisions": out}, indent=2)); return 0
+
+
+def cmd_ceiling(args) -> int:
+    from attenu_derive import config as cfg
+    if args.set is not None:
+        cfg.set_ceiling(Path(args.dir), args.set)
+    print(json.dumps({"ceiling": cfg.get_ceiling(Path(args.dir))}, indent=2)); return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="attenu", description="Attenu day-0 kit + onboarding + offline evidence verify")
     ap.add_argument("--version", action="version", version=f"attenu {__version__}")
@@ -193,6 +209,10 @@ def build_parser() -> argparse.ArgumentParser:
     po = sub.add_parser("policy", help="show / set this product's defaults for what the catalog cannot resolve (unknown tools: deny | heuristic)")
     po.add_argument("--dir", default="."); po.add_argument("--unknown-tools", choices=["deny", "heuristic"], default=None)
     po.set_defaults(fn=cmd_policy)
+    cf = sub.add_parser("config", help="the product's signed config revisions (grants, declared tools, policy): log + diffs")
+    cf.add_argument("--dir", default="."); cf.set_defaults(fn=cmd_config)
+    ce = sub.add_parser("ceiling", help="show / set the ceiling: the scopes this product may EVER be granted (a revision beyond it is refused)")
+    ce.add_argument("--dir", default="."); ce.add_argument("--set", nargs="*", default=None, metavar="SCOPE"); ce.set_defaults(fn=cmd_ceiling)
     lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
     lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://app.attenu.io")); lk.set_defaults(fn=cmd_link)

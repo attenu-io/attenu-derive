@@ -44,7 +44,7 @@ def test_product_pack_declares_a_tool_and_merges_over_the_domain(tmp_path, monke
     from attenu_derive.catalog.coverage import load_catalog, load_domain
     from attenu_derive.derive.disposition import tool_dispositions
     monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "T")
-    assert product.load_pack(tmp_path / "proj") == {"tools": {}}
+    assert product.load_pack(tmp_path / "proj")["tools"] == {}           # (pack.json is materialized from revision 0 now: tools + policy)
     e = product.declare_tool(tmp_path / "proj", "lookup_loyalty_tier", scope="data.read", tier=0)
     assert e == {"scope": "data.read", "tier": 0}
     e2 = product.declare_tool(tmp_path / "proj", "refund_customer", scope="payments.transfer", tier=2)
