@@ -2,6 +2,8 @@
 import json
 import stat
 
+import pytest
+
 from attenu_derive import product
 
 
@@ -34,3 +36,25 @@ def test_grants_file_round_trip(tmp_path, monkeypatch):
     assert product.add_grant(tmp_path / "proj", "payments.transfer") == {"payments.transfer"}
     assert product.add_grant(tmp_path / "proj", "payments.transfer") == {"payments.transfer"}     # idempotent
     assert product.load_grants(tmp_path / "proj") == {"payments.transfer"}
+
+
+def test_product_pack_declares_a_tool_and_merges_over_the_domain(tmp_path, monkeypatch):
+    """Declaring = curating a tool into a PRODUCT-LOCAL pack overlay (.attenu/pack.json); the runners merge it over
+    the domain pack (product wins). Tier 2 is never auto-granted: it is written requires_grant."""
+    from attenu_derive.catalog.coverage import load_catalog, load_domain
+    from attenu_derive.derive.disposition import tool_dispositions
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "T")
+    assert product.load_pack(tmp_path / "proj") == {"tools": {}}
+    e = product.declare_tool(tmp_path / "proj", "lookup_loyalty_tier", scope="data.read", tier=0)
+    assert e == {"scope": "data.read", "tier": 0}
+    e2 = product.declare_tool(tmp_path / "proj", "refund_customer", scope="payments.transfer", tier=2)
+    assert e2["requires_grant"] is True
+    with pytest.raises(ValueError):
+        product.declare_tool(tmp_path / "proj", "x", scope="Not A Scope", tier=0)
+    with pytest.raises(ValueError):
+        product.declare_tool(tmp_path / "proj", "x", scope="data.read", tier=7)
+    dom = product.effective_domain(load_domain("travel-booking"), tmp_path / "proj")
+    d = tool_dispositions(load_catalog(), dom, ["lookup_loyalty_tier", "refund_customer", "book_flight"], operator_grants=set())
+    assert d["lookup_loyalty_tier"] == ("data.read", None)                                   # declared -> grantable
+    assert d["refund_customer"] == ("payments.transfer", "held_pending_grant")                 # tier-2 -> held
+    assert d["book_flight"][0] == "payments.transfer"                                          # the domain pack still applies

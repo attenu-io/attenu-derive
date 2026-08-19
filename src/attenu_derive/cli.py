@@ -177,7 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
     i.set_defaults(fn=cmd_init)
     pr = sub.add_parser("products", help="products known on this machine"); pr.set_defaults(fn=cmd_products)
     d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")
-    d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, help="seconds between steps (animate a watching UI)")
+    d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, metavar="SECONDS", help="pause SECONDS between steps so a watching UI animates (e.g. --slow 1); default 0 = instant")
     d.set_defaults(fn=cmd_demo)
     lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)

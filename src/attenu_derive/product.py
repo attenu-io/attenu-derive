@@ -17,7 +17,8 @@ from pathlib import Path
 from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
-           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta"]
+           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta",
+           "pack_path", "load_pack", "declare_tool", "effective_domain"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -108,3 +109,43 @@ def note_run(product_dir: Path, boot_id: str, *, framework: str | None, mode: st
 def run_meta(product_dir: Path, boot_id: str) -> dict:
     p = Path(product_dir) / ".attenu" / "runs" / f"{boot_id}.json"
     return json.loads(p.read_text()) if p.exists() else {}
+
+
+# ---- product-local pack overlay: "declare" a tool the catalog does not know (the console's Declare decision) -----
+import re as _re
+_SCOPE_RE = _re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_*]+)+$")
+
+
+def pack_path(product_dir: Path) -> Path:
+    return Path(product_dir) / ".attenu" / "pack.json"
+
+
+def load_pack(product_dir: Path) -> dict:
+    p = pack_path(product_dir)
+    return json.loads(p.read_text()) if p.exists() else {"tools": {}}
+
+
+def declare_tool(product_dir: Path, tool: str, *, scope: str, tier: int = 0, requires_grant: bool | None = None) -> dict:
+    """Curate `tool` -> `scope` into the product's pack overlay. Tier 2 is NEVER auto-granted (requires_grant=True
+    unless explicitly overridden); the operator still grants it in Decisions. Validates the scope shape."""
+    if not isinstance(scope, str) or not _SCOPE_RE.match(scope):
+        raise ValueError(f"scope must look like family.action (got {scope!r})")
+    if tier not in (0, 1, 2):
+        raise ValueError("tier must be 0, 1 or 2")
+    entry: dict = {"scope": scope, "tier": int(tier)}
+    if tier == 2 and requires_grant is not False:
+        entry["requires_grant"] = True
+    pack = load_pack(product_dir); pack.setdefault("tools", {})[tool] = entry
+    p = pack_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(pack, indent=2))
+    return entry
+
+
+def effective_domain(domain: dict | None, product_dir: Path | None) -> dict:
+    """The domain pack with the product's declarations merged on top (product wins). Never widens a curated entry
+    silently: the merge is explicit per tool, and the file is the operator's own."""
+    base = dict(domain or {}); tools = dict(base.get("tools") or {})
+    if product_dir is not None:
+        tools.update(load_pack(product_dir).get("tools") or {})
+    base["tools"] = tools
+    return base
