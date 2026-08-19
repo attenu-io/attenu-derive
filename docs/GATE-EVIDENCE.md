@@ -114,8 +114,20 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   allow-list re-validated on ingest, anchors append-only, content-free heartbeats, grants pulled); Installations +
   Attenu admin. Verified end to end locally (token → link → sync → chains verified in the cloud) and from the built
   image. **Not yet hosted** — needs the free accounts in `attenu-console/docs/DEPLOY.md` (Neon, Fly/Cloud Run,
-  WorkOS; Rafael). G4: the packaged local path and the cloud path both exist; what remains for "production grade" is
-  slice 2 (signed config revisions + ceiling, KMS anchoring) and a hosted deployment.
+  WorkOS; Rafael).
+- **Control with integrity (2026-08-19, slice 2):** every change to what a product may do (grants, declared tools,
+  policy) is a **signed config revision** — hashed, parent-chained, verified before a runner applies it, refused beyond
+  the product's **ceiling** and on conflict (last-known-good stays); the cloud's revisions are signed by the Attenu
+  signer the engine trusts offline; `attenu config` / `attenu ceiling`; the console shows "what I decided and what
+  changed" with diffs and signatures. **Custody options:** product-local Ed25519 key (default) or **KMS** (`attenu init
+  --anchor kms`; ES256; the key never leaves the HSM; auditors verify with `ECDSAP256Verifier`, no cloud SDK) —
+  stub-tested until an AWS account exists. **Out-of-band anchoring** (`AnchorScheduler`) for long-running apps.
+  **Evidence report** (`attenu report`, the console's Report button): a printable page rendered from the bundle +
+  verification — the three checks, the anchor key, the chain as tree + table, denials in plain words, how to re-verify.
+  **Demo depth:** `attenu demo --scenario fanout` (9 agents / 18 tools / every disposition / a strike revocation) and
+  the real 21-agent travel-concierge run live as a 3-level chain. Two real bugs found by the richer app and fixed
+  RED→GREEN (ADK transfer-back treated as a delegation; the enforce runner's sub-agent requests lacking their own
+  descendants). G4: what remains for "production grade" is a hosted deployment and the slice-3 surface.
 
 ## G5 — day-0 story
 
