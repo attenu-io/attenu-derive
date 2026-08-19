@@ -97,12 +97,34 @@ def cmd_verify(args) -> int:
     from delegation_guard import evidence
     from delegation_guard.wire import HS256TestSigner
     bundle = json.loads(Path(args.bundle).read_text())
-    if not args.hs256_key:
-        print("verify needs --hs256-key <hex> (the anchor signing key)", file=sys.stderr); return 2
-    signer = HS256TestSigner(secret=bytes.fromhex(args.hs256_key), kid=args.kid)
+    if getattr(args, "pubkey", None):
+        from delegation_guard.wire import Ed25519Verifier
+        signer = Ed25519Verifier(bytes.fromhex(args.pubkey), kid=args.kid)           # public key only: an auditor needs no secret
+    elif args.hs256_key:
+        signer = HS256TestSigner(secret=bytes.fromhex(args.hs256_key), kid=args.kid)
+    else:
+        print("verify needs --pubkey <hex> (the product's anchor public key) or --hs256-key <hex> (test signer)", file=sys.stderr); return 2
     rep = evidence.verify_bundle(bundle, signer)
     print(json.dumps(rep, indent=2))
     return 0 if rep["ok"] else 1
+
+
+def cmd_init(args) -> int:
+    from attenu_derive import product
+    meta = product.init_product(Path(args.dir), args.product, args.env)
+    print(json.dumps({"product_dir": str(Path(args.dir).resolve()),
+                      **{k: meta[k] for k in ("product_id", "name", "environment", "anchor_kid")}}, indent=2))
+    return 0
+
+
+def cmd_products(args) -> int:
+    from attenu_derive import product
+    rows = product.registry_list()
+    if not rows:
+        print("no products on this machine yet — run: attenu init --product <name> [--env dev] [--dir .]")
+    for r in rows:
+        print(f"{r['product_id']}  {r['name']}  [{r['environment']}]  {r['dir']}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,7 +136,13 @@ def build_parser() -> argparse.ArgumentParser:
     o = sub.add_parser("onboard", help="day-0 report + a draft domain pack for the gaps")
     o.add_argument("files", nargs="+"); o.add_argument("--domain", default=None); o.add_argument("--scaffold", default=None); o.set_defaults(fn=cmd_onboard)
     v = sub.add_parser("verify", help="offline-verify an exported evidence bundle")
-    v.add_argument("bundle"); v.add_argument("--hs256-key", default=None); v.add_argument("--kid", default="k1"); v.set_defaults(fn=cmd_verify)
+    v.add_argument("bundle"); v.add_argument("--hs256-key", default=None); v.add_argument("--kid", default="k1")
+    v.add_argument("--pubkey", default=None, help="the product's Ed25519 anchor public key (hex) — from .attenu/product.json anchor_pub")
+    v.set_defaults(fn=cmd_verify)
+    i = sub.add_parser("init", help="give this directory a product identity + a local anchor key (no cloud, no token)")
+    i.add_argument("--product", required=True); i.add_argument("--env", default="dev"); i.add_argument("--dir", default=".")
+    i.set_defaults(fn=cmd_init)
+    pr = sub.add_parser("products", help="products known on this machine"); pr.set_defaults(fn=cmd_products)
     return ap
 
 

@@ -41,3 +41,27 @@ def test_cli_verify_a_real_bundle(tmp_path, capsys):
     b = tmp_path / "bundle.json"; b.write_text(json.dumps(evidence.export_bundle(root.audit_log(), signer)))
     assert main(["verify", str(b), "--hs256-key", key.hex()]) == 0
     assert '"ok": true' in capsys.readouterr().out
+
+
+def test_cli_init_and_products(tmp_path, monkeypatch, capsys):
+    from attenu_derive.cli import main
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    assert main(["init", "--product", "Mortgage Assistant", "--env", "dev", "--dir", str(tmp_path / "proj")]) == 0
+    assert (tmp_path / "proj" / ".attenu" / "product.json").exists()
+    capsys.readouterr()
+    assert main(["products"]) == 0 and "Mortgage Assistant" in capsys.readouterr().out
+
+
+def test_cli_verify_with_a_public_key(tmp_path, monkeypatch, capsys):
+    import json
+    from attenu_derive import product
+    from attenu_derive.cli import main
+    from delegation_guard import Authority, Guard, evidence
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    meta = product.init_product(tmp_path / "proj", "CS")
+    g = Guard.issue("a", Authority({"crm.read"}, [], ttl=None), task="t"); g.check("crm.read", tool="q")
+    bundle = evidence.export_bundle(g.audit_log(), product.load_anchor_signer(tmp_path / "proj"))
+    (tmp_path / "b.json").write_text(json.dumps(bundle))
+    assert main(["verify", str(tmp_path / "b.json"), "--pubkey", meta["anchor_pub"], "--kid", meta["anchor_kid"]]) == 0
+    bundle["entries"][-1]["tool"] = "tampered"; (tmp_path / "b2.json").write_text(json.dumps(bundle))
+    assert main(["verify", str(tmp_path / "b2.json"), "--pubkey", meta["anchor_pub"], "--kid", meta["anchor_kid"]]) == 1

@@ -24,10 +24,11 @@ import sys
 import time
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, RowLimit, EgressRank
+from delegation_guard import Authority, Guard, RowLimit, EgressRank, identity
 from delegation_guard.wire import HS256TestSigner
 
-from attenu_derive.catalog.coverage import load_catalog, load_domain, resolve
+from attenu_derive.catalog.coverage import load_catalog, load_domain
+from attenu_derive.derive.disposition import tool_dispositions
 from attenu_derive.sample.run_adk_app import declared_suites, load_root_agent, override_models, walk_agents
 
 # The installation's ceiling: the scopes an operator is willing to hand this app AT ALL. The derived authority
@@ -45,19 +46,27 @@ def installation_authority(domain: dict, operator_grants: set[str]) -> Authority
     return Authority(scopes, [RowLimit(1_000_000), EgressRank("any")], ttl=None)
 
 
-def tool_authorities(agent, domain: dict):
-    """{tool_name: ToolAuthority(scope)} for an agent's tools, resolved through the CURATED pack (enforce = curated only)."""
+def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset()):
+    """{tool_name: ToolAuthority(scope, disposition=...)} for an agent's tools, resolved through the CURATED pack
+    (enforce = curated only). Every tool is declared — including the ones the pack does not know, which get an
+    `unknown.<name>` scope and `disposition=unresolved` so a call to them is denied AS unresolved rather than
+    looking like over-reach. A curated tier-2 tool without a grant (or a scope the operator held back) is declared
+    `held_pending_grant`: the shim still denies it (the scope is absent from the installation authority), but the
+    ledger and the denial say "waiting on you", not "stopped"."""
     from delegation_guard.adapters.google_adk import ToolAuthority
-    from google.adk.tools.agent_tool import AgentTool
-    cat = load_catalog(); out = {}
+    try:
+        from google.adk.tools.agent_tool import AgentTool
+    except Exception:  # noqa: BLE001 - tests may pass plain stand-ins without google.adk on the path
+        AgentTool = ()
+    names = []
     for t in (getattr(agent, "tools", None) or []):
-        if isinstance(t, AgentTool):
+        if AgentTool and isinstance(t, AgentTool):
             continue                                    # delegation, governed by `delegations`
         name = getattr(t, "name", None) or getattr(t, "__name__", None)
-        e = resolve(cat, name, overlay=domain)
-        if e and not str(e.get("scope", "")).startswith("unknown."):
-            out[name] = ToolAuthority(e["scope"])
-    return out
+        if name:
+            names.append(name)
+    disp = tool_dispositions(load_catalog(), domain, names, set(grants), held=set(held), heuristics=False)
+    return {name: ToolAuthority(scope, disposition=d) for name, (scope, d) in disp.items()}
 
 
 def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float, hold: set[str] | None = None):
@@ -85,9 +94,18 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
         inst = Authority(set(inst.scopes) | {f"agent.delegate.{a.name}" for a in agents if a is not root_agent}, inst.ceilings, ttl=None)
     tools = {}
     for a in agents:
-        tools.update(tool_authorities(a, domain))
+        tools.update(tool_authorities(a, domain, grants=grants, held=hold))
 
-    root_guard = Guard.issue(root_agent.name, inst, task=prompt[:60])
+    # Product identity (console design §5a): inside a product dir the ledger, spool and evidence live under
+    # `.attenu/` with an assigned chain id and a per-process boot id; outside one, the runner behaves as before.
+    product_dir = identity.find_product_dir()
+    chain_id = identity.new_chain_id("adk")
+    issue_kwargs = {}
+    if product_dir is not None:
+        from delegation_guard.sinks import SpoolSink
+        issue_kwargs = {"chain_id": chain_id, "audit_path": identity.ledger_path(product_dir, chain_id),
+                        "audit_sinks": (SpoolSink(identity.spool_path(product_dir)),)}
+    root_guard = Guard.issue(root_agent.name, inst, task=prompt[:60], **issue_kwargs)
     plugin = DelegationGuardPlugin(root_guard, root_agent_name=root_agent.name, delegations=delegations, tools=tools,
                                    delegation_scope="agent.delegate")   # ENFORCE: no observe hooks; undeclared tool/agent fails closed
     app = App(name="attenu-enforce", root_agent=root_agent, plugins=[plugin])
@@ -124,24 +142,53 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
             graph[a.name] = {"scopes": sorted(g.authority.scopes),
                              "narrower_than_root": g.is_narrower_than(root_guard) if a is not root_agent else None,
                              "parent": next((x.get("parent") for x in root_guard.audit_log().entries if x.get("event") == "spawn" and x.get("agent") == a.name), None)}
-    signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor")
     entries = root_guard.audit_log().entries
     ledger_denies = [e for e in entries if e.get("event") == "deny"]
     spawns = [e for e in entries if e.get("event") == "spawn"]
-    # T33a: export the offline evidence bundle and verify it from the bundle ALONE (no engine) — the proof a reviewer runs
-    from delegation_guard import evidence
-    bundle = evidence.export_bundle(root_guard.audit_log(), signer)
-    bundle_check = evidence.verify_bundle(bundle, signer)
-    anchor = root_guard.audit_log().anchor(signer)
-    from delegation_guard import AuditLog
-    anchor_ok, _ = AuditLog.verify_anchor(entries, anchor, signer)
+    ev = write_evidence(root_guard, product_dir)
     return {"prompt": prompt, "model": model, "domain": domain_name, "operator_grants": sorted(grants),
             "installation_scopes": sorted(inst.scopes), "stubbed_tools": changed["stubbed_tools"],
             "tool_calls": tool_calls, "denials_returned_to_model": denials,
-            "ledger_deny_events": [{"scope": e.get("scope"), "tool": e.get("tool"), "reason": e.get("reason")} for e in ledger_denies],
+            "ledger_deny_events": [{"scope": e.get("scope"), "tool": e.get("tool"), "reason": e.get("reason"),
+                                    "disposition": e.get("disposition")} for e in ledger_denies],
             "ledger_entries": len(entries), "delegation_graph": graph, "spawns": [{"agent": e.get("agent"), "parent": e.get("parent")} for e in spawns],
-            "anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0},
-            "evidence_bundle_offline_verify": bundle_check, "delegation_graph_view": evidence.delegation_graph(bundle)}
+            "product": ({"dir": str(product_dir), **{k: v for k, v in _product_meta(product_dir).items() if k in ("product_id", "name", "environment")}}
+                        if product_dir is not None else None),
+            "chain_id": root_guard.chain_id, **ev}
+
+
+def _product_meta(product_dir) -> dict:
+    from attenu_derive.product import load_product_json
+    return load_product_json(product_dir)
+
+
+def write_evidence(root_guard, product_dir) -> dict:
+    """Anchor + export the offline evidence bundle and verify it from the bundle ALONE (no engine) — the proof a
+    reviewer runs. Custody (console design §7): INSIDE a product the anchor is signed with the product's own
+    Ed25519 key (`attenu init`), the bundle is written under `.attenu/evidence/<boot>/<chain_id>.bundle.json`, and
+    it verifies with the product's PUBLIC key; OUTSIDE a product the old ephemeral HMAC test signer is used and the
+    report says so ("attenu-anchor-TEST") so it can never be mistaken for custody."""
+    from delegation_guard import AuditLog, evidence
+    from pathlib import Path as _P
+    if product_dir is not None:
+        from attenu_derive.product import load_anchor_signer, load_anchor_verifier
+        signer = load_anchor_signer(product_dir); verifier = load_anchor_verifier(product_dir)
+    else:
+        signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor-TEST"); verifier = signer
+    log = root_guard.audit_log(); entries = log.entries
+    bundle = evidence.export_bundle(log, signer)
+    bundle_check = evidence.verify_bundle(bundle, verifier)
+    anchor = log.anchor(signer)
+    anchor_ok, _ = AuditLog.verify_anchor(entries, anchor, verifier)
+    spawns = [e for e in entries if e.get("event") == "spawn"]
+    bundle_path = None
+    if product_dir is not None:
+        out = _P(product_dir) / ".attenu" / "evidence" / identity.boot_id() / f"{root_guard.chain_id}.bundle.json"
+        out.parent.mkdir(parents=True, exist_ok=True); out.write_text(json.dumps(bundle, indent=2)); bundle_path = str(out)
+    return {"anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0},
+            "anchor_kid": anchor.get("kid"), "ledger_path": str(log.path) if log.path else None, "bundle_path": bundle_path,
+            "evidence_bundle_offline_verify": bundle_check, "delegation_graph_view": evidence.delegation_graph(bundle),
+            "denials_view": evidence.denials(bundle)}
 
 
 def main(argv=None) -> int:
