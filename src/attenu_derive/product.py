@@ -18,7 +18,7 @@ from pathlib import Path
 from delegation_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
-           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta",
+           "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "remove_grant", "note_run", "run_meta",
            "pack_path", "load_pack", "declare_tool", "effective_domain", "get_policy", "set_policy", "POLICY_DEFAULTS", "POLICY_CHOICES"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -132,6 +132,17 @@ def add_grant(product_dir: Path, scope: str, *, by: str | None = None) -> set[st
     if scope in g:
         return g
     _cfg.commit(product_dir, grants=sorted(g | {scope}), by=by)
+    return load_grants(product_dir)
+
+
+def remove_grant(product_dir: Path, scope: str, *, by: str | None = None) -> set[str]:
+    """The revert of add_grant — a SIGNED revision that removes the grant (the diff shows `- revoked grant`), so the
+    runners stop seeing the scope on their next pull. Idempotent: removing what was never granted commits nothing."""
+    from attenu_derive import config as _cfg
+    g = load_grants(product_dir)
+    if scope not in g:
+        return g
+    _cfg.commit(product_dir, grants=sorted(g - {scope}), by=by)
     return load_grants(product_dir)
 
 

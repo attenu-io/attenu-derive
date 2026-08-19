@@ -95,3 +95,16 @@ def test_cli_config_log_and_ceiling(proj, capsys):
     assert main(["ceiling", "--dir", str(proj), "--set", "data.read", "data.write"]) == 0
     assert '"data.write"' in capsys.readouterr().out
     assert main(["ceiling", "--dir", str(proj)]) == 0 and "data.read" in capsys.readouterr().out
+
+
+def test_remove_grant_is_a_signed_revision_and_the_runners_stop_seeing_the_scope(proj):
+    """Rafael, 2026-08-19: 'after clicking grant scope there is no way to revert.' Reverting = a signed revision
+    that removes the grant — same audit trail as granting; the materialized grants.json follows."""
+    product.add_grant(proj, "payments.transfer"); product.add_grant(proj, "mail.send")
+    assert product.remove_grant(proj, "payments.transfer") == {"mail.send"}
+    assert product.load_grants(proj) == {"mail.send"}                                       # what the runners read
+    log = cfg.log(proj)
+    assert cfg.diff(log[-2], log[-1])["grants"]["removed"] == ["payments.transfer"]          # the audit trail
+    assert cfg.verify_revision(proj, log[-1])
+    assert product.remove_grant(proj, "never.granted") == {"mail.send"}                      # no-op, no new revision
+    assert cfg.head(proj)["rev"] == log[-1]["rev"]
