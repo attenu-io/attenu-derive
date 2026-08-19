@@ -63,3 +63,20 @@ bundle's own contents, not a hash.
 - **`attenu verify` fails integrity** → the bundle was altered or the anchor key is wrong. Do not trust the log.
 - **`attenu verify` fails monotonicity/containment** → the ledger claims a delegation/action outside authority;
   treat as a tampered or buggy producer, not an Attenu enforcement result.
+
+## Data custody — what does and does not leave the premises
+
+Attenu collects **no background telemetry.** The only data that ever leaves is a bundle **you export and send**,
+via `attenu_derive.flywheel.export_for_flywheel` (or `attenu verify` locally, which sends nothing). That bundle
+is enforced-redacted and refuses to emit anything unvetted (`EvidenceLeakError`):
+
+**Leaves the premises (redacted):** the hash-chained ledger structure — event types, node/agent ids, scopes,
+decisions (allow/deny), reasons, the derived authorities per node — plus tool-call context restricted to
+**redacted features only** (argument *shapes*, quantity *buckets*, salted *hashes*; ceiling context the guard
+sets). Free-text prompts are replaced by a length+hash marker before the bundle is signed.
+
+**Never leaves:** raw tool-argument values, raw prompt/task text, tool outputs, customer records. These are
+caught by an allow-list check that fails the export rather than shipping an unknown field or a raw context value.
+
+The bundle remains offline-verifiable after redaction — `attenu verify` still confirms integrity, monotonicity
+and containment, because redaction only removes and the anchor is computed over the redacted form.
