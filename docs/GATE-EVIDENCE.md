@@ -106,8 +106,16 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   *Grant scope* writes `.attenu/grants.json`, which `run_adk_enforce` and `attenu demo` read — the loop closes).
   Proven from a fresh venv with three wheels and no source tree; `attenu demo` (USD 0, no model) produces a real
   anchored ledger so the demo never needs a key.
-- **Outstanding:** the service-mode / cloud deployment (tokens, ingest, heartbeat, installations view — Plan C).
-  G4 near-complete.
+- **Service mode / cloud deployment: BUILT (2026-08-19, slice 1 / Plan C)** — the same console in cloud mode
+  (`attenu-console`, one container, Postgres with RLS FORCEd for a non-owner role + negative tests per table):
+  accounts → products → environments → installations; self-serve expiring installation tokens (EdDSA, verified
+  OFFLINE by `attenu_derive.license` against bundled public keys; gate at START on the real enforce runners; observe
+  free); `attenu link` / `attenu sync` (spool drain keyed (installation, boot, chain, seq, hash), forks alerted,
+  allow-list re-validated on ingest, anchors append-only, content-free heartbeats, grants pulled); Installations +
+  Attenu admin. Verified end to end locally (token → link → sync → chains verified in the cloud) and from the built
+  image. **Not yet hosted** — needs the free accounts in `attenu-console/docs/DEPLOY.md` (Neon, Fly/Cloud Run,
+  WorkOS; Rafael). G4: the packaged local path and the cloud path both exist; what remains for "production grade" is
+  slice 2 (signed config revisions + ceiling, KMS anchoring) and a hosted deployment.
 
 ## G5 — day-0 story
 
