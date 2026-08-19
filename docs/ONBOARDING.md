@@ -24,7 +24,9 @@ day-0 into a confident, curated grant for *this* app's tools.
    - never widen: if unsure whether a tool writes, mark it the higher tier. Fail-closed beats guessing.
 4. **Verify: 0 benign blocks, tier-2 held.** `eval.enforce` (or a shadow run) with the pack: the app's
    own workload must show **0 benign blocks** on the scopes you granted, and the `requires_grant` tools
-   must show as **held** until you grant them.
+   must show as **held** until you grant them. On the ledger these are three different words — a deny's
+   `disposition` is `held_pending_grant` (waiting on you), `unresolved` (declare the tool) or
+   `out_of_authority` (real over-reach) — so "held" never reads as "denied" in any view.
 5. **Enforce.** Install the shim in enforce mode with the derived authority (`run_adk_enforce` shows the
    wiring). Grant the tier-2 scopes the app legitimately needs (`--grant payments.transfer`), leave the
    rest held. A tool call outside the granted authority is denied live, with the denial on the anchored

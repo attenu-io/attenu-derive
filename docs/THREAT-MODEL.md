@@ -107,7 +107,12 @@ salted hashes. No argument value, key, or payload is written to the shipped corp
   failure mode is denial, not over-grant. Mitigated by shadow-first rollout (would-deny, block nothing)
   and the benign-deny gate (hold-out ≤ 2%); measured continuously. A new domain's tool that resolves
   only to a withheld tier-2 family is *held pending curation* — visible, not silently denied — and the
-  day-0 kit must surface that state distinctly (product requirement, tracked for G4).
+  day-0 kit must surface that state distinctly. **Closed at the ledger (2026-08-19, console slice 1):**
+  every `deny` carries a `disposition` (`held_pending_grant` · `withheld_tier2` · `unresolved` ·
+  `out_of_authority`) stated by `derive.disposition.tool_dispositions()` and recorded by the shim; the
+  denial handed to the model carries the same word; undeclared tools land on the ledger as `unresolved` in
+  every adapter. Tests: shim `tests/test_core_v02.py` (disposition), `tests/test_adapters_contract.py`,
+  engine `tests/test_disposition.py`, `tests/test_run_adk_enforce.py`.
 - **R-b: A curated catalog error.** Curated entries are trusted; a wrong one (e.g. a genuine payment tool
   mapped to `data.read`) would under-restrict. Mitigation: curated entries are the reviewed surface;
   heuristics — the un-reviewed surface — are structurally barred from tier-2 (I4), so the un-reviewed
@@ -128,7 +133,8 @@ salted hashes. No argument value, key, or payload is written to the shipped corp
 - **Ledger anchoring (ADR-14):** external anchor for the chain head; the revocation authority model.
 - **Denial contract + strike policy:** uniform machine-readable denial; revoke after N same-scope denials
   (decided: N=3, per-installation configurable); surface a child's denial to its parent.
-- **Day-0 "held pending curation" UX:** distinct from "denied", with a fast curation path (G4).
+- **Day-0 "held pending curation" UX:** distinct from "denied", with a fast curation path (G4). **Ledger
+  half done** (`disposition`, above); the UI half is the console's Decisions queue (slice 1, Plan B).
 
 ## Evidence (reproducible)
 

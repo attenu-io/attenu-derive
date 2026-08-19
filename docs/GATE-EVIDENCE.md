@@ -92,8 +92,16 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   mitigations + Phase-B/C actions, labelled internal (`docs/SECURITY-REVIEW.md`). External review is Phase C.
 - **Perf:** `Deriver.propose` p50 0.038 ms / p95 0.074 ms / max 0.178 ms over real events (budget <50 ms);
   model path N/A (L3 never built).
-- **Outstanding:** the delegation-graph *UI* (the data model + `evidence.delegation_graph` exist), and the
-  service-mode deployment beyond the SDK/CLI. G4 near-complete.
+- **Ledger contract for the console (2026-08-19, slice 1 / Plan A):** held ≠ denied is now ON the ledger
+  (`disposition` on every deny, in the model-facing denial, across all 12 adapters); products have an identity
+  before a key (`attenu init` → `.attenu/product.json`, per-process boot id, assigned chain ids); the spool sink
+  carries the ingest idempotency key; inside a product the anchor is signed with a **product-local Ed25519 key**
+  and verified with the public key only (`attenu verify --pubkey`) — the HMAC test signer survives only outside a
+  product and is labelled `attenu-anchor-TEST`. Repro: shim `python tests/test_core_v02.py`,
+  `python tests/test_sinks_identity.py`, `python tests/test_adapters_contract.py`; engine
+  `python -m pytest -q tests/test_disposition.py tests/test_product.py tests/test_run_adk_enforce.py tests/test_cli.py`.
+- **Outstanding:** the delegation-graph *UI* (the data model + `evidence.delegation_graph` / `denials` folds exist;
+  Plan B), and the service-mode deployment beyond the SDK/CLI (Plan C). G4 near-complete.
 
 ## G5 — day-0 story
 
