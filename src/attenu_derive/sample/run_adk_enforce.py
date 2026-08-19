@@ -25,10 +25,10 @@ import time
 from pathlib import Path
 
 from delegation_guard import Authority, Guard, RowLimit, EgressRank, identity
-from delegation_guard.wire import HS256TestSigner
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
+from attenu_derive.evidence_out import effective_grants, product_meta as _product_meta, write_evidence  # noqa: F401 (re-exported)
 from attenu_derive.sample.run_adk_app import declared_suites, load_root_agent, override_models, walk_agents
 
 # The installation's ceiling: the scopes an operator is willing to hand this app AT ALL. The derived authority
@@ -67,16 +67,6 @@ def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(
             names.append(name)
     disp = tool_dispositions(load_catalog(), domain, names, set(grants), held=set(held), heuristics=False)
     return {name: ToolAuthority(scope, disposition=d) for name, (scope, d) in disp.items()}
-
-
-def effective_grants(cli_grants: set[str], product_dir) -> set[str]:
-    """CLI `--grant`s plus the product's operator grants (`.attenu/grants.json`, written by the console's
-    Decisions screen) — so a grant decided in the console reaches the live runner without a flag."""
-    g = set(cli_grants or ())
-    if product_dir is not None:
-        from attenu_derive.product import load_grants
-        g |= load_grants(product_dir)
-    return g
 
 
 def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model: str, max_llm_calls: int, timeout_s: float, hold: set[str] | None = None):
@@ -166,40 +156,6 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
             "product": ({"dir": str(product_dir), **{k: v for k, v in _product_meta(product_dir).items() if k in ("product_id", "name", "environment")}}
                         if product_dir is not None else None),
             "chain_id": root_guard.chain_id, **ev}
-
-
-def _product_meta(product_dir) -> dict:
-    from attenu_derive.product import load_product_json
-    return load_product_json(product_dir)
-
-
-def write_evidence(root_guard, product_dir) -> dict:
-    """Anchor + export the offline evidence bundle and verify it from the bundle ALONE (no engine) — the proof a
-    reviewer runs. Custody (console design §7): INSIDE a product the anchor is signed with the product's own
-    Ed25519 key (`attenu init`), the bundle is written under `.attenu/evidence/<boot>/<chain_id>.bundle.json`, and
-    it verifies with the product's PUBLIC key; OUTSIDE a product the old ephemeral HMAC test signer is used and the
-    report says so ("attenu-anchor-TEST") so it can never be mistaken for custody."""
-    from delegation_guard import AuditLog, evidence
-    from pathlib import Path as _P
-    if product_dir is not None:
-        from attenu_derive.product import load_anchor_signer, load_anchor_verifier
-        signer = load_anchor_signer(product_dir); verifier = load_anchor_verifier(product_dir)
-    else:
-        signer = HS256TestSigner(secret=os.urandom(16), kid="attenu-anchor-TEST"); verifier = signer
-    log = root_guard.audit_log(); entries = log.entries
-    bundle = evidence.export_bundle(log, signer)
-    bundle_check = evidence.verify_bundle(bundle, verifier)
-    anchor = log.anchor(signer)
-    anchor_ok, _ = AuditLog.verify_anchor(entries, anchor, verifier)
-    spawns = [e for e in entries if e.get("event") == "spawn"]
-    bundle_path = None
-    if product_dir is not None:
-        out = _P(product_dir) / ".attenu" / "evidence" / identity.boot_id() / f"{root_guard.chain_id}.bundle.json"
-        out.parent.mkdir(parents=True, exist_ok=True); out.write_text(json.dumps(bundle, indent=2)); bundle_path = str(out)
-    return {"anchor": {"seq": anchor["seq"], "head": anchor["head"], "verified": anchor_ok, "covers_chain": len(spawns) > 0},
-            "anchor_kid": anchor.get("kid"), "ledger_path": str(log.path) if log.path else None, "bundle_path": bundle_path,
-            "evidence_bundle_offline_verify": bundle_check, "delegation_graph_view": evidence.delegation_graph(bundle),
-            "denials_view": evidence.denials(bundle)}
 
 
 def main(argv=None) -> int:

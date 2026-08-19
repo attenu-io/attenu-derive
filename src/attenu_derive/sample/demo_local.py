@@ -26,7 +26,7 @@ from delegation_guard.sinks import SpoolSink
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
 from attenu_derive.product import load_grants
-from attenu_derive.sample.run_adk_enforce import write_evidence
+from attenu_derive.evidence_out import write_evidence
 
 PLANNER = "travel_planner"
 BOOKER = "booking_agent"
