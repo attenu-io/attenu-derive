@@ -31,6 +31,8 @@ def _booker_authority(operator_grants: set[str]) -> Authority:
 
 
 def run(task_text: str, *, grants: set[str], model: str = "claude-haiku-4-5-20251001", recursion_limit: int = 20):
+    from attenu_derive import license; from delegation_guard import identity as _idn
+    license.require("enforce", _idn.find_product_dir())   # the licence gate — at START, never mid-run
     from langchain_anthropic import ChatAnthropic
     from langchain_core.tools import tool
     from deepagents import create_deep_agent

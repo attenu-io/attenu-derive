@@ -78,6 +78,8 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     from google.genai import types
     from delegation_guard.adapters.google_adk import DelegationGuardPlugin
 
+    from attenu_derive import license
+    license.require("enforce", identity.find_product_dir())        # the licence gate — at START, never mid-run
     domain = load_domain(domain_name)
     grants = effective_grants(grants, identity.find_product_dir())
     root_agent = load_root_agent(app_dir)
