@@ -8,9 +8,11 @@ committed gold + the local corpus (mirrored to the private bucket).*
 
 ## Bounds and honest limitations (read first)
 
-- **G3 volume is not met: 438 real delegation events against a 2,000 target.** The normalized public-dataset
-  target (≥10,000) is met at 18,450, but the real-trace target is not. A direct consequence of deliberately
-  stopping the sampling run when its data went stale. Rafael's decision (options in §G3).
+- **G3 real-event volume is DEFERRED to real-customer data (Rafael's decision, 2026-08-19).** 438 real
+  delegation events against a 2,000 target; the normalized-dataset target (≥10,000) is met at 18,450. The
+  2,000 was always a proxy for corpus richness bought from ourselves; the flywheel (customer-exported bundles,
+  never background telemetry) supplies real volume once a design partner runs the loop. "Deferred to
+  real-customer data", not "not met". The 25%-non-code G3 amendment is parked with it.
 - **Every customer-domain app measured is Google ADK.** customer-service and financial-advisor are both ADK
   on Haiku/Sonnet via LiteLLM. Framework diversity exists in the *code*-repo corpus (4 frameworks) but not in
   the customer-domain slice. The CrewAI/LangChain/Claude-SDK adapters are tested, but not on a customer-domain
@@ -39,8 +41,8 @@ committed gold + the local corpus (mirrored to the private bucket).*
 |---|---|---|---|
 | G1 | Derivation works on real tasks | **MET** (on 13 clean hold-out rows) | benign-deny 0.0, unused 5.8%, escalation 0 |
 | G2 | Protects real projects (enforce) | **MET** (ADK customer-domain; live) | 21/21: 0 benign blocks; over-reach 8,783/8,783; injection 0 widened; live single + chain; Haiku ≡ Sonnet |
-| G3 | Data flywheel / volume | **NOT MET** (real events) / MET (datasets) | 438 / 2,000 real events · 18,450 / 10,000 dataset rows |
-| G4 | Production grade | **PARTIAL** | onboarding ≤1h MET; service/SDK/runbook/security-review outstanding |
+| G3 | Data flywheel / volume | **DEFERRED** (real events, Rafael) / MET (datasets) | 438 real events (target parked) · 18,450 / 10,000 dataset rows |
+| G4 | Production grade | **NEAR-COMPLETE** | packaged onboarding ≤1h MET; SDK/CLI + runbook + internal review done; graph-UI + service-mode outstanding |
 | G5 | Day-0 story | **MET** (out-of-sample) | held-out app: safe day-0, 100% curated in minutes |
 
 ## G1 — derivation works
@@ -66,18 +68,25 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
 
 ## G3 — data flywheel
 
-- Real corpus: **438 delegation events / 599 rows / 21 projects × 4 frameworks** (target ≥ 2,000 — **NOT met**).
+- Real corpus: **438 delegation events / 599 rows / 21 projects × 4 frameworks**. The ≥2,000 real-event target
+  is **DEFERRED to real-customer data** (Rafael, 2026-08-19): 2,000 bought from ourselves was a proxy; real
+  volume arrives via the flywheel — **customer-initiated evidence-bundle export, never background telemetry**
+  (the custody story is the thing a bank buys). The 25%-non-code amendment is parked with it.
 - Normalized datasets: **18,450 rows** (BFCL + hermes + ToolACE; target ≥ 10,000 — MET).
 - Versioned corpus + eval harness gate every release in CI (G1 + adversarial + injection gates + corpus lint). MET.
-- **Decision for Rafael:** (a) resume bounded sampling with the improved harnesses; (b) restate the event
-  target and let the dataset rows carry volume (2,000 was always a proxy for richness); (c) record the gap.
 
 ## G4 — production grade
 
 - **Onboard in ≤ 1 hour:** MET — travel-concierge to 100% curated in minutes following `docs/ONBOARDING.md`.
 - Threat model, denial contract, strike policy, ledger anchoring (ADR-14): filed and tested.
-- **Outstanding (T33):** installable service + SDK, config, delegation-graph / evidence-export view, ops
-  runbook, security review + red team on the derivation input, perf numbers. G4 is PARTIAL until these land.
+- **Packaging (Phase A1):** installable wheel + `attenu` CLI (`onboard`/`coverage`/`verify`) — installs into a
+  clean env with no source tree; onboarding re-measured **through the packaged path** at ~1s (`docs/OPS-RUNBOOK.md`).
+- **Internal security review** vs the 5 threat-model invariants: all pass, 2 trust-boundary concerns with
+  mitigations + Phase-B/C actions, labelled internal (`docs/SECURITY-REVIEW.md`). External review is Phase C.
+- **Perf:** `Deriver.propose` p50 0.038 ms / p95 0.074 ms / max 0.178 ms over real events (budget <50 ms);
+  model path N/A (L3 never built).
+- **Outstanding:** the delegation-graph *UI* (the data model + `evidence.delegation_graph` exist), and the
+  service-mode deployment beyond the SDK/CLI. G4 near-complete.
 
 ## G5 — day-0 story
 
