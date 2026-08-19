@@ -46,7 +46,7 @@ def installation_authority(domain: dict, operator_grants: set[str]) -> Authority
     return Authority(scopes, [RowLimit(1_000_000), EgressRank("any")], ttl=None)
 
 
-def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset()):
+def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(), heuristics: bool = False):
     """{tool_name: ToolAuthority(scope, disposition=...)} for an agent's tools, resolved through the CURATED pack
     (enforce = curated only). Every tool is declared — including the ones the pack does not know, which get an
     `unknown.<name>` scope and `disposition=unresolved` so a call to them is denied AS unresolved rather than
@@ -65,7 +65,7 @@ def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(
         name = getattr(t, "name", None) or getattr(t, "__name__", None)
         if name:
             names.append(name)
-    disp = tool_dispositions(load_catalog(), domain, names, set(grants), held=set(held), heuristics=False)
+    disp = tool_dispositions(load_catalog(), domain, names, set(grants), held=set(held), heuristics=heuristics)
     return {name: ToolAuthority(scope, disposition=d) for name, (scope, d) in disp.items()}
 
 
@@ -96,9 +96,17 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     delegations = {a.name: inst for a in agents if a is not root_agent}
     if delegations:
         inst = Authority(set(inst.scopes) | {f"agent.delegate.{a.name}" for a in agents if a is not root_agent}, inst.ceilings, ttl=None)
+    from attenu_derive.product import get_policy
+    product_dir_for_policy = identity.find_product_dir()
+    heur = bool(product_dir_for_policy) and get_policy(product_dir_for_policy)["unknown_tools"] == "heuristic"
+    if heur:
+        print("attenu: product policy unknown_tools=heuristic — tier-0/1 name heuristics may grant unknown tools (tier-2 always withheld)", file=sys.stderr)
     tools = {}
     for a in agents:
-        tools.update(tool_authorities(a, domain, grants=grants, held=hold))
+        tools.update(tool_authorities(a, domain, grants=grants, held=hold, heuristics=heur))
+    if heur:   # heuristic-grantable scopes join the installation ceiling (they are what the policy allows); curated semantics unchanged
+        extra = {ta.scope for ta in tools.values() if ta.disposition is None and not ta.scope.startswith("unknown.")}
+        inst = Authority(set(inst.scopes) | extra, inst.ceilings, ttl=None)
 
     # Product identity (console design §5a): inside a product dir the ledger, spool and evidence live under
     # `.attenu/` with an assigned chain id and a per-process boot id; outside one, the runner behaves as before.

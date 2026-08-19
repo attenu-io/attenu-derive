@@ -18,7 +18,7 @@ from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
            "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "note_run", "run_meta",
-           "pack_path", "load_pack", "declare_tool", "effective_domain"]
+           "pack_path", "load_pack", "declare_tool", "effective_domain", "get_policy", "set_policy", "POLICY_DEFAULTS", "POLICY_CHOICES"]
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -149,3 +149,27 @@ def effective_domain(domain: dict | None, product_dir: Path | None) -> dict:
         tools.update(load_pack(product_dir).get("tools") or {})
     base["tools"] = tools
     return base
+
+
+# ---- product policy: the defaults an operator chooses for what the catalog cannot resolve ----------------------
+# unknown_tools:
+#   deny       (default) an unknown tool is DENIED, disposition `unresolved`, until declared — fail-closed.
+#   heuristic  the catalog's NAME heuristics may grant tier-0/1 families (reads, plain writes) for unknown tools;
+#              tier-2 (money, mail, delete, exec) is ALWAYS withheld by a heuristic — a standing decision.
+POLICY_DEFAULTS = {"unknown_tools": "deny"}
+POLICY_CHOICES = {"unknown_tools": ("deny", "heuristic")}
+
+
+def get_policy(product_dir: Path) -> dict:
+    pol = dict(POLICY_DEFAULTS); pol.update(load_pack(product_dir).get("policy") or {})
+    return pol
+
+
+def set_policy(product_dir: Path, key: str, value: str) -> dict:
+    if key not in POLICY_CHOICES:
+        raise ValueError(f"unknown policy {key!r}; known: {sorted(POLICY_CHOICES)}")
+    if value not in POLICY_CHOICES[key]:
+        raise ValueError(f"{key} must be one of {POLICY_CHOICES[key]} (got {value!r})")
+    pack = load_pack(product_dir); pack.setdefault("tools", {}); pack.setdefault("policy", {})[key] = value
+    p = pack_path(product_dir); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(json.dumps(pack, indent=2))
+    return get_policy(product_dir)

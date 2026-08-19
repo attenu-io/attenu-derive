@@ -95,3 +95,13 @@ def test_cli_sync_on_an_unlinked_product_says_so(tmp_path, monkeypatch, capsys):
     assert main(["init", "--product", "T", "--dir", str(tmp_path / "proj")]) == 0
     capsys.readouterr()
     assert main(["sync", "--dir", str(tmp_path / "proj")]) == 1 and "not linked" in capsys.readouterr().out
+
+
+def test_cli_policy_show_and_set(tmp_path, monkeypatch, capsys):
+    from attenu_derive.cli import main
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    assert main(["init", "--product", "T", "--dir", str(tmp_path / "proj")]) == 0
+    capsys.readouterr()
+    assert main(["policy", "--dir", str(tmp_path / "proj")]) == 0 and '"unknown_tools": "deny"' in capsys.readouterr().out
+    assert main(["policy", "--dir", str(tmp_path / "proj"), "--unknown-tools", "heuristic"]) == 0
+    assert '"unknown_tools": "heuristic"' in capsys.readouterr().out

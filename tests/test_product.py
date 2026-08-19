@@ -58,3 +58,28 @@ def test_product_pack_declares_a_tool_and_merges_over_the_domain(tmp_path, monke
     assert d["lookup_loyalty_tier"] == ("data.read", None)                                   # declared -> grantable
     assert d["refund_customer"] == ("payments.transfer", "held_pending_grant")                 # tier-2 -> held
     assert d["book_flight"][0] == "payments.transfer"                                          # the domain pack still applies
+
+
+def test_unknown_tools_policy_default_deny_then_heuristic(tmp_path, monkeypatch):
+    """Rafael: 'where can I define default actions for unknowns?' -> the product policy. Default = deny (fail-closed,
+    unresolved). `heuristic` lets the catalog's NAME heuristics grant tier-0/1 families (reads, plain writes);
+    tier-2 (money, mail, delete, exec) is ALWAYS withheld by a heuristic — that is a standing decision."""
+    from attenu_derive.sample.demo_local import run_demo
+    from delegation_guard import evidence
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "T")
+    assert product.get_policy(tmp_path / "proj") == {"unknown_tools": "deny"}
+    rep = run_demo(tmp_path / "proj")
+    assert [r for r in rep["denials_view"] if r["tool"] == "lookup_loyalty_tier"][0]["disposition"] == "unresolved"
+    with pytest.raises(ValueError):
+        product.set_policy(tmp_path / "proj", "unknown_tools", "yolo")
+    with pytest.raises(ValueError):
+        product.set_policy(tmp_path / "proj", "not_a_policy", "deny")
+    assert product.set_policy(tmp_path / "proj", "unknown_tools", "heuristic") == {"unknown_tools": "heuristic"}
+    rep = run_demo(tmp_path / "proj")
+    assert not [r for r in rep["denials_view"] if r["tool"] == "lookup_loyalty_tier"]       # read-verb heuristic -> data.read -> allowed
+    assert [r for r in rep["denials_view"] if r["tool"] == "book_flight"]                   # curated tier-2 still held
+    # a tier-2 heuristic is withheld, never granted, even under the heuristic policy
+    from attenu_derive.catalog.coverage import load_catalog
+    from attenu_derive.derive.disposition import tool_dispositions
+    d = tool_dispositions(load_catalog(), None, ["delete_account", "run_shell"], set(), heuristics=True)
+    assert d["delete_account"][1] == "withheld_tier2" and d["run_shell"][1] == "withheld_tier2"

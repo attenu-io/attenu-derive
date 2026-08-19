@@ -160,6 +160,16 @@ def cmd_sync(args) -> int:
         _t.sleep(args.every)
 
 
+def cmd_policy(args) -> int:
+    from attenu_derive import product
+    d = Path(args.dir)
+    if args.unknown_tools:
+        product.set_policy(d, "unknown_tools", args.unknown_tools)
+    print(json.dumps({"product_dir": str(d.resolve()), "policy": product.get_policy(d),
+                      "choices": {k: list(v) for k, v in product.POLICY_CHOICES.items()}}, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="attenu", description="Attenu day-0 kit + onboarding + offline evidence verify")
     ap.add_argument("--version", action="version", version=f"attenu {__version__}")
@@ -179,6 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
     d = sub.add_parser("demo", help="USD-0 scripted travel-booking run that writes a REAL ledger into this product (no model, no key)")
     d.add_argument("--dir", default="."); d.add_argument("--slow", type=float, default=0.0, metavar="SECONDS", help="pause SECONDS between steps so a watching UI animates (e.g. --slow 1); default 0 = instant")
     d.set_defaults(fn=cmd_demo)
+    po = sub.add_parser("policy", help="show / set this product's defaults for what the catalog cannot resolve (unknown tools: deny | heuristic)")
+    po.add_argument("--dir", default="."); po.add_argument("--unknown-tools", choices=["deny", "heuristic"], default=None)
+    po.set_defaults(fn=cmd_policy)
     lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
     lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://app.attenu.io")); lk.set_defaults(fn=cmd_link)

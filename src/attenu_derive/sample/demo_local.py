@@ -25,7 +25,7 @@ from delegation_guard.sinks import SpoolSink
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
-from attenu_derive.product import effective_domain, load_grants, note_run
+from attenu_derive.product import effective_domain, get_policy, load_grants, note_run
 from attenu_derive.evidence_out import write_evidence
 
 PLANNER = "travel_planner"
@@ -37,7 +37,8 @@ def run_demo(product_dir: Path, *, slow: float = 0.0, grants: set[str] | None = 
     product_dir = Path(product_dir)
     grants = set(grants) if grants is not None else load_grants(product_dir)
     domain = effective_domain(load_domain("travel-booking"), product_dir); cat = load_catalog()   # + the product's declarations
-    disp = tool_dispositions(cat, domain, CHILD_TOOLS, grants, heuristics=False)
+    heur = get_policy(product_dir)["unknown_tools"] == "heuristic"           # product policy for what the catalog cannot resolve
+    disp = tool_dispositions(cat, domain, CHILD_TOOLS, grants, heuristics=heur)
 
     # installation authority: what the operator is willing to hand this app at all (held tier-2 absent)
     inst_scopes = {sc for sc, d in disp.values() if d is None} | {f"agent.delegate.{BOOKER}"}
