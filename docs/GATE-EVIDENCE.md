@@ -100,8 +100,14 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   product and is labelled `attenu-anchor-TEST`. Repro: shim `python tests/test_core_v02.py`,
   `python tests/test_sinks_identity.py`, `python tests/test_adapters_contract.py`; engine
   `python -m pytest -q tests/test_disposition.py tests/test_product.py tests/test_run_adk_enforce.py tests/test_cli.py`.
-- **Outstanding:** the delegation-graph *UI* (the data model + `evidence.delegation_graph` / `denials` folds exist;
-  Plan B), and the service-mode deployment beyond the SDK/CLI (Plan C). G4 near-complete.
+- **Delegation-graph UI: DONE in local mode (2026-08-19, slice 1 / Plan B)** — the private `attenu-console` package
+  (`attenu ui`): products → chains → the delegation graph with denials by disposition + **verified ✓** (integrity ·
+  monotonicity · containment against the product's public key) → evidence download → **Decisions** (questions;
+  *Grant scope* writes `.attenu/grants.json`, which `run_adk_enforce` and `attenu demo` read — the loop closes).
+  Proven from a fresh venv with three wheels and no source tree; `attenu demo` (USD 0, no model) produces a real
+  anchored ledger so the demo never needs a key.
+- **Outstanding:** the service-mode / cloud deployment (tokens, ingest, heartbeat, installations view — Plan C).
+  G4 near-complete.
 
 ## G5 — day-0 story
 
