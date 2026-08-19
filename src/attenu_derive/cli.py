@@ -186,6 +186,17 @@ def cmd_ceiling(args) -> int:
     print(json.dumps({"ceiling": cfg.get_ceiling(Path(args.dir))}, indent=2)); return 0
 
 
+def cmd_report(args) -> int:
+    from attenu_derive import report
+    d = Path(args.dir); ev = d / ".attenu" / "evidence"; written = []
+    for bp in sorted(ev.glob("*/*.bundle.json")) if ev.exists() else []:
+        if args.chain and bp.stem.replace(".bundle", "") != args.chain:
+            continue
+        written.append(str(report.write_chain_report(d, bp)))
+    summary = ev / "index.html"; ev.mkdir(parents=True, exist_ok=True); summary.write_text(report.render_product_report(d)); written.append(str(summary))
+    print(json.dumps({"reports": written}, indent=2)); return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="attenu", description="Attenu day-0 kit + onboarding + offline evidence verify")
     ap.add_argument("--version", action="version", version=f"attenu {__version__}")
@@ -213,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     cf.add_argument("--dir", default="."); cf.set_defaults(fn=cmd_config)
     ce = sub.add_parser("ceiling", help="show / set the ceiling: the scopes this product may EVER be granted (a revision beyond it is refused)")
     ce.add_argument("--dir", default="."); ce.add_argument("--set", nargs="*", default=None, metavar="SCOPE"); ce.set_defaults(fn=cmd_ceiling)
+    rp = sub.add_parser("report", help="write printable evidence reports (HTML) for this product's chains + a product summary (print -> PDF)")
+    rp.add_argument("--dir", default="."); rp.add_argument("--chain", default=None); rp.set_defaults(fn=cmd_report)
     lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
     lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://app.attenu.io")); lk.set_defaults(fn=cmd_link)
