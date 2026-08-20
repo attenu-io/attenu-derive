@@ -249,7 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
     rp.add_argument("--dir", default="."); rp.add_argument("--chain", default=None); rp.set_defaults(fn=cmd_report)
     lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
-    lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://app.attenu.io")); lk.set_defaults(fn=cmd_link)
+    lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://console.attenu.io")); lk.set_defaults(fn=cmd_link)
     sy = sub.add_parser("sync", help="drain the spool + anchors to the cloud, heartbeat, pull grants (a separate process — never in the deny path)")
     sy.add_argument("--dir", default="."); sy.add_argument("--watch", action="store_true"); sy.add_argument("--every", type=float, default=10.0)
     sy.set_defaults(fn=cmd_sync)
