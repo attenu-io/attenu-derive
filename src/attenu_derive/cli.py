@@ -4,7 +4,7 @@ from an installed console script rather than `python -m`. Subcommands:
 
     attenu coverage  <corpus.jsonl ...> [--domain NAME]    # what the kit resolves for these tool calls
     attenu onboard   <mirror.jsonl ...> [--domain NAME]    # day-0 report + a DRAFT domain pack for the gaps
-    attenu verify    <bundle.json> --hs256-key <hex>       # offline-verify an exported evidence bundle
+    attenu verify    <bundle.json> --pubkey <hex>          # offline-verify an exported evidence bundle (--hs256-key = test signer)
     attenu --version
 
 `onboard` is the ≤1h path: it prints the day-0 coverage (shipped kit only), and — for every tool the base

@@ -5,7 +5,8 @@ paths assume the packaged `attenu` CLI (installs from a wheel, no source tree).*
 
 ## Install
 
-    pip install attenu-derive            # brings delegation-guard (the enforcement shim) as a dependency
+    pip install attenu_derive-<version>-py3-none-any.whl   # private wheel, supplied with the pilot pack
+    # (brings delegation-guard, the enforcement library, as a dependency)
     attenu --version
 
 ## 1. Shadow first (zero risk)
@@ -40,7 +41,7 @@ the ledger.
 ## 5. Export + verify evidence (offline)
 
     # the app exports a bundle from its audit log (delegation_guard.evidence.export_bundle)
-    attenu verify bundle.json --hs256-key <hex>        # or an Ed25519 verifier in production
+    attenu verify bundle.json --pubkey <hex>           # --hs256-key is the offline TEST signer only — never the auditor path
 
 Returns `{integrity, monotonicity, containment}`. An auditor runs this against the bundle **with no access
 to the engine** — a rewritten-and-re-signed log still fails, because the invariants are checked against the
