@@ -21,7 +21,7 @@ def test_chain_report_contains_checks_agents_denials_and_reverify_instructions(t
     verifier = product.load_anchor_verifier(d)
     html = report.render_chain_report(bundle, evidence.verify_bundle(bundle, verifier), product.load_product_json(d))
     for needle in ("verified", "integrity", "monotonicity", "containment", product.load_product_json(d)["anchor_kid"],
-                   "trip_planner", "reviews_scout", "support_agent", "⊂", "held — waiting on you", "out of authority", "unresolved",
+                   "trip_planner", "reviews_scout", "support_agent", "⊂", "request held", "out of authority", "unresolved",
                    "revoked", "book_flight", "update_crm_note", "attenu verify", "--pubkey"):
         assert needle in html, needle
     assert html.count("<tr") >= 9                                             # one row per agent at least

@@ -5,7 +5,7 @@ from the bundle ALONE plus its offline verification (a fold; no engine, nothing 
 
 Sections: verification (the three checks, the anchor key, how to re-verify yourself); the delegation chain as a
 table (agent, parent, authority, allowed, denials) and as an indented tree; what was denied and why, in the user's
-words (held — waiting on you · unresolved — declare it · out of authority — stopped · revoked); the decisions on
+words (request held · unresolved — declare it · out of authority — stopped · revoked); the decisions on
 record; the ledger tail. Static, no scripts.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from delegation_guard import evidence
 
 __all__ = ["render_chain_report", "render_product_report", "write_chain_report"]
 
-_LABEL = {"held_pending_grant": "held — waiting on you", "withheld_tier2": "withheld (tier-2)", "unresolved": "unresolved — declare it",
+_LABEL = {"held_pending_grant": "request held", "withheld_tier2": "request held (tier-2)", "unresolved": "unresolved — declare it",
           "out_of_authority": "out of authority — stopped", "revoked": "revoked — authority withdrawn", "ceiling_exceeded": "over ceiling — stopped"}
 _CSS = """
 body{font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;max-width:60rem;margin:2rem auto;padding:0 1rem}
