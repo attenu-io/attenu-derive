@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "attenu-derive"
 version = "0.1.0"
 description = "Attenu derivation engine — task -> minimal enforceable authority for attenu-guard (PRIVATE)"
+keywords = ["ai", "agents", "security", "authorization", "least-privilege", "permissions", "delegation", "sub-agents", "audit-log", "owasp", "langgraph", "crewai", "google-adk", "openai-agents", "claude-agent-sdk"]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }

@@ -4,6 +4,8 @@
 
 [attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (the enforcement library this engine feeds) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
 
+**Works with** LangGraph · LangChain / deepagents · OpenAI Agents SDK · Google ADK · Pydantic AI · CrewAI · AutoGen · Claude Agent SDK · smolagents · AWS Strands · LlamaIndex · Semantic Kernel · Agno — unmodified (table below).
+
 `attenu-derive` reads your agent application — the agents you declared, their roster, the tools
 each one has, what each task actually calls — and computes the permission set each task needs.
 [`attenu-guard`](https://github.com/attenu-io/attenu-guard) enforces that set inside your process,
@@ -37,6 +39,31 @@ Nobody writes a policy. Nobody describes one in prose. The input is the app itse
 
 Permissions come from declared structure — never from prompt text. Prompt injection can talk the
 model into *asking*; it cannot widen what the process is allowed to do.
+
+## Supported frameworks
+
+The engine feeds [`attenu-guard`](https://github.com/attenu-io/attenu-guard), whose adapters attach at each
+framework's official extension points — the framework stays **unmodified**. Observe-mode recorders exist for
+the same set.
+
+| Framework | Adapter | Offline demo + tests | Enforced live on a real app |
+|---|---|---|---|
+| LangGraph / LangChain `create_agent` / deepagents | `attenu_guard.adapters.langgraph`, `.langchain` | ✓ | ✓ (travel-booking) |
+| Google ADK | `.google_adk` | ✓ | ✓ (customer-service, financial-advisor, travel-concierge) |
+| CrewAI | `.crewai` | ✓ | ✓ (travel-booking) |
+| OpenAI Agents SDK | `.openai_agents` | ✓ | — |
+| Claude Agent SDK | `.claude_sdk` | ✓ | live-verified sub-agent denial |
+| Pydantic AI | `.pydantic_ai` | ✓ | — |
+| AutoGen | `.autogen` | ✓ | — |
+| smolagents | `.smolagents` | ✓ | — |
+| AWS Strands | `.strands` | ✓ | — |
+| LlamaIndex | `.llama_index` | ✓ | — |
+| Semantic Kernel | `.semantic_kernel` | ✓ | — |
+| Agno | `.agno` | ✓ | — |
+
+Pinned versions run in CI; a weekly job tests the unpinned latest of every framework, so upstream breakage
+is caught on our side first. MCP and A2A: the guard's wire format carries the chain across services;
+server-side verification examples are on the roadmap.
 
 ## Quick start
 
