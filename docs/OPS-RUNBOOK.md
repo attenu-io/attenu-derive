@@ -68,7 +68,7 @@ bundle's own contents, not a hash.
 ## Data custody — what does and does not leave the premises
 
 Attenu collects **no background telemetry.** The only data that ever leaves is a bundle **you export and send**,
-via `attenu_derive.flywheel.export_for_flywheel` (or `attenu verify` locally, which sends nothing). That bundle
+via `attenu_cloud.flywheel.export_for_flywheel` (or `attenu verify` locally, which sends nothing). That bundle
 is enforced-redacted and refuses to emit anything unvetted (`EvidenceLeakError`):
 
 **Leaves the premises (redacted):** the hash-chained ledger structure — event types, node/agent ids, scopes,

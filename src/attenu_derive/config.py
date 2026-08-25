@@ -3,7 +3,7 @@
 Everything an operator decides about what a product may do — operator grants, declared tools, policy — is a
 REVISION: a plain dict, hashed (sha256 over canonical JSON without `sig`), chained by `parent_hash`, and SIGNED —
 locally by the product's own Ed25519 anchor key (`signer_kid` = the product's `anchor_kid`), in the cloud by the
-Attenu signer whose public half the engine already bundles (`license.ISSUER_KEYS`). `apply_revision` verifies the
+Attenu signer whose public half the optional `attenu_cloud` client contributes (`config.ISSUER_KEYS`). `apply_revision` verifies the
 signature against exactly that keyring, checks the chain (fast-forward from local HEAD, else conflict), checks the
 CEILING (`.attenu/ceiling.json`: grants may never exceed `max_scopes`), and only then MATERIALIZES the files the
 runners read (`grants.json`, `pack.json`). A bad revision is refused loudly; last-known-good stays. The control
@@ -56,10 +56,20 @@ def sign_revision(rev: dict, *, private_hex: str | None = None, kid: str, signer
     return body
 
 
+ISSUER_KEYS: dict[str, str] = {}
+"""kid -> Ed25519 public key (hex) of signers trusted for cloud-pushed revisions, in addition to the product's own
+anchor key. Empty in the open engine; the optional `attenu_cloud` client contributes the Attenu issuer keys when
+it is installed; tests and operators may register their own."""
+
+
 def _keyring(product_dir: Path) -> dict[str, str]:
-    from attenu_derive import license
     from attenu_derive.product import load_product_json
-    ring = dict(license.ISSUER_KEYS)
+    ring = dict(ISSUER_KEYS)
+    try:
+        from attenu_cloud import license as _cloud_license   # optional client package
+        ring.update(_cloud_license.ISSUER_KEYS)
+    except Exception:  # noqa: BLE001 — not installed: local signer only
+        pass
     try:
         meta = load_product_json(product_dir); ring[meta["anchor_kid"]] = meta["anchor_pub"]
     except Exception:  # noqa: BLE001

@@ -43,8 +43,6 @@ def _authorities(operator_grants: set[str]):
 
 
 def run(task_text: str, *, grants: set[str], model: str = "anthropic/claude-haiku-4-5-20251001", max_iter: int = 6):
-    from attenu_derive import license; from attenu_guard import identity as _idn
-    license.require("enforce", _idn.find_product_dir())   # the licence gate — at START, never mid-run
     from crewai import Agent, Crew, LLM, Process, Task
     from crewai.hooks import clear_all_global_hooks
     from crewai.tools import tool

@@ -67,13 +67,13 @@ def test_tampered_foreign_and_over_ceiling_revisions_are_refused_and_last_known_
 def test_cloud_revision_applies_on_fast_forward_and_is_kept_out_on_conflict(proj, monkeypatch):
     """A revision signed by the Attenu issuer (the cloud) applies when it extends local HEAD; a diverged one is
     refused (local last-known-good kept) — the engine never silently widens on a conflict."""
-    from attenu_derive import license
+    from attenu_derive import config as _cfgmod
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ed25519
     sk = ed25519.Ed25519PrivateKey.generate()
     priv = sk.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()).hex()
     pub = sk.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
-    monkeypatch.setitem(license.ISSUER_KEYS, "cloud-test", pub)
+    monkeypatch.setitem(_cfgmod.ISSUER_KEYS, "cloud-test", pub)
     head = cfg.head(proj)
     cloud_rev = cfg.sign_revision(cfg.build_revision(parent=head, grants=["mail.send"], declared_tools={}, policy=head["policy"], by="alice@bank.test"),
                                   private_hex=priv, kid="cloud-test")

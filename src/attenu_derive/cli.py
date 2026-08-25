@@ -145,14 +145,20 @@ def cmd_ui(args) -> int:
 
 
 def cmd_link(args) -> int:
-    from attenu_derive.cloud import link
+    try:
+        from attenu_cloud.client import link
+    except ImportError:
+        print("attenu link needs the Attenu cloud client: pip install attenu-console (optional; nothing else needs it)", file=sys.stderr); return 2
     out = link(Path(args.dir), args.token, base_url=args.url, environment=args.env)
     print(json.dumps({k: out[k] for k in ("product_id", "environment", "base_url")}, indent=2)); return 0
 
 
 def cmd_sync(args) -> int:
     import time as _t
-    from attenu_derive.cloud import sync
+    try:
+        from attenu_cloud.client import sync
+    except ImportError:
+        print("attenu sync needs the Attenu cloud client: pip install attenu-console (optional; nothing else needs it)", file=sys.stderr); return 2
     while True:
         rep = sync(Path(args.dir)); print(json.dumps(rep))
         if not args.watch:

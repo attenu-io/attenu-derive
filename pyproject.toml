@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "attenu-derive"
-version = "0.1.0"
-description = "Attenu derivation engine — task -> minimal enforceable authority for attenu-guard (PRIVATE)"
+version = "0.2.0"
+description = "Agent permissions, read from your app — not written, not described. Computes the permission set each agent task needs; attenu-guard enforces it."
 keywords = ["ai", "agents", "security", "authorization", "least-privilege", "permissions", "delegation", "sub-agents", "audit-log", "owasp", "langgraph", "crewai", "google-adk", "openai-agents", "claude-agent-sdk"]
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
+license = "Apache-2.0"
 authors = [{ name = "Attenu" }]
 dependencies = ["attenu-guard>=0.4", "pyyaml>=6", "cryptography>=41"]     # the enforcement shim; the engine proposes, the shim's meet disposes
 

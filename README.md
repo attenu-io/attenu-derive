@@ -134,5 +134,5 @@ in git · secrets never in the product · every derivation record carries the de
 
 ## License
 
-Apache-2.0 from the public release (see `LICENSE`). Contributions under the DCO. Security policy:
+Apache-2.0 (see `LICENSE`). Contributions under the DCO. Security policy:
 `security@attenu.io`.

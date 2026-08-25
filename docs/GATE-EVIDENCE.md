@@ -109,7 +109,7 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
 - **Service mode / cloud deployment: BUILT (2026-08-19, slice 1 / Plan C)** — the same console in cloud mode
   (`attenu-console`, one container, Postgres with RLS FORCEd for a non-owner role + negative tests per table):
   accounts → products → environments → installations; self-serve expiring installation tokens (EdDSA, verified
-  OFFLINE by `attenu_derive.license` against bundled public keys; gate at START on the real enforce runners; observe
+  OFFLINE by the optional `attenu_cloud.license` client against bundled public keys (the open engine has no gate); previously gated at START on the real enforce runners; observe
   free); `attenu link` / `attenu sync` (spool drain keyed (installation, boot, chain, seq, hash), forks alerted,
   allow-list re-validated on ingest, anchors append-only, content-free heartbeats, grants pulled); Installations +
   Attenu admin. Verified end to end locally (token → link → sync → chains verified in the cloud) and from the built

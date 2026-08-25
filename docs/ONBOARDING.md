@@ -67,7 +67,7 @@ app is 100% curated with the two money tools held — one `--grant payments.tran
     attenu onboard traces.jsonl --domain my-app --scaffold my-app.yaml
     # 3. EDIT my-app.yaml — the judgement step (see cost below) — then move it into catalog/domains/
     # 4. verify: attenu coverage traces.jsonl --domain my-app   (expect unresolved 0, tier-2 requires_grant)
-    # 5. enforce with the pack + operator_grants; export evidence with attenu_derive.flywheel.export_for_flywheel
+    # 5. enforce with the pack + operator_grants; export evidence with attenu_cloud.flywheel.export_for_flywheel
     # 6. an auditor runs: attenu verify bundle.json --pubkey <hex>   (integrity / subset / containment)
 
 ## Onboarding cost — measured (A2c)
