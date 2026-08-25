@@ -21,7 +21,7 @@ jobs:
             printf '%s\n' "$DG_DEPLOY_KEY" > ~/.ssh/dg_deploy_key && chmod 600 ~/.ssh/dg_deploy_key
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
             export GIT_SSH_COMMAND="ssh -i ~/.ssh/dg_deploy_key -o IdentitiesOnly=yes"
-            pip install -q "attenu-guard @ git+ssh://git@github.com/rafaelasor/attenu-guard.git"
+            pip install -q "attenu-guard @ git+ssh://git@github.com/attenu-io/attenu-guard.git"
             pip install -q -e .
           else
             echo "::warning::DG_DEPLOY_KEY not set — installing without attenu-guard"
