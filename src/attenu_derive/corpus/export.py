@@ -1,5 +1,5 @@
 """
-Export the delegation-guard audit log of a sampled run into corpus rows.
+Export the attenu-guard audit log of a sampled run into corpus rows.
 
 One row per DELEGATION EVENT (the root and every `spawn`), carrying that node's
 recorded tool calls (`allow`/`deny` events on the node) as `child_calls`, the

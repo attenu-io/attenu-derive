@@ -35,5 +35,5 @@ class KMSSigner:
         return self._c.sign(KeyId=self.key_id, Message=signing_input, MessageType="RAW", SigningAlgorithm="ECDSA_SHA_256")["Signature"]
 
     def verify(self, signing_input: bytes, sig: bytes, key_id: str | None = None) -> bool:
-        from delegation_guard.wire import ECDSAP256Verifier
+        from attenu_guard.wire import ECDSAP256Verifier
         return ECDSAP256Verifier(self.public_spki_der(), kid=self.kid).verify(signing_input, sig, key_id)

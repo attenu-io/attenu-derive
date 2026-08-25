@@ -25,8 +25,8 @@ def test_enforce_denies_a_held_scope_and_passes_a_granted_one():
     from google.adk.runners import Runner
     from google.adk.sessions.in_memory_session_service import InMemorySessionService
     from google.genai import types
-    from delegation_guard import Authority, Guard
-    from delegation_guard.adapters.google_adk import DelegationGuardPlugin
+    from attenu_guard import Authority, Guard
+    from attenu_guard.adapters.google_adk import DelegationGuardPlugin
 
     dom = load_domain("retail-support")
 
@@ -81,8 +81,8 @@ def test_chain_enforce_child_is_narrower_and_denied_a_scope_the_parent_lacks():
     from google.adk.sessions.in_memory_session_service import InMemorySessionService
     from google.adk.tools.agent_tool import AgentTool
     from google.genai import types
-    from delegation_guard import Authority, Guard, RowLimit, EgressRank
-    from delegation_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
+    from attenu_guard import Authority, Guard, RowLimit, EgressRank
+    from attenu_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
 
     class Chain(BaseLlm):
         model: str = "scripted"; seen: dict = {}
@@ -154,7 +154,7 @@ def test_run_with_a_product_dir_uses_the_product_anchor_key_never_the_test_signe
     from pathlib import Path
     from attenu_derive import product
     from attenu_derive.sample import run_adk_enforce as R
-    from delegation_guard import Authority, Guard, evidence, identity
+    from attenu_guard import Authority, Guard, evidence, identity
     monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "CS", "dev")
     monkeypatch.setenv("ATTENU_PRODUCT_DIR", str(tmp_path / "proj"))
     pd = identity.find_product_dir()

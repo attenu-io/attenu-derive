@@ -42,7 +42,7 @@ tools:
   load_artifacts:    {scope: fs.read, consumes: {}, tier: 0}
   load_memory:       {scope: data.read, consumes: {}, tier: 0}
   preload_memory:    {scope: data.read, consumes: {}, tier: 0}
-  # --- framework demo tools (delegation-guard examples) -----------------------------------
+  # --- framework demo tools (attenu-guard examples) -----------------------------------
   crm_query:   {scope: crm.read,   consumes: {rows: max_rows}, tier: 1}
   crm_export:  {scope: crm.export, consumes: {destination: egress}, tier: 2}
   send_mail:   {scope: mail.send,  consumes: {to: egress}, tier: 2}

@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "attenu-derive"
 version = "0.1.0"
-description = "Attenu derivation engine — task -> minimal enforceable authority for delegation-guard (PRIVATE)"
+description = "Attenu derivation engine — task -> minimal enforceable authority for attenu-guard (PRIVATE)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "Attenu" }]
-dependencies = ["delegation-guard>=0.3", "pyyaml>=6", "cryptography>=41"]     # the enforcement shim; the engine proposes, the shim's meet disposes
+dependencies = ["attenu-guard>=0.4", "pyyaml>=6", "cryptography>=41"]     # the enforcement shim; the engine proposes, the shim's meet disposes
 
 [project.scripts]
 attenu = "attenu_derive.cli:main"

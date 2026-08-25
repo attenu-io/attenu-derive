@@ -1,4 +1,4 @@
-"""attenu-derive — task -> minimal enforceable authority (proposal); delegation-guard's meet disposes.
+"""attenu-derive — task -> minimal enforceable authority (proposal); attenu-guard's meet disposes.
 
 Public SDK:
     from attenu_derive import Deriver, DelegationEvent, load_catalog, load_domain

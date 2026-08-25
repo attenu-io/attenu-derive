@@ -27,7 +27,7 @@ def test_heuristic_tier2_is_withheld_only_when_heuristics_are_on():
 
 
 def test_every_disposition_value_is_a_shim_constant():
-    from delegation_guard import Disposition
+    from attenu_guard import Disposition
     cat, dom = load_catalog(), load_domain("retail-support")
     d = tool_dispositions(cat, dom, ["send_care_instructions", "x_unknown"], operator_grants=set(), heuristics=True)
     assert all(v[1] is None or v[1] in Disposition.ALL for v in d.values())

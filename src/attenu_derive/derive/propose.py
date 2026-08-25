@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-from delegation_guard import Authority, CallLimit, EgressRank, RowLimit
+from attenu_guard import Authority, CallLimit, EgressRank, RowLimit
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
 from attenu_derive.derive import templates

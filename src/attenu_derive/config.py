@@ -20,7 +20,7 @@ import os
 import time
 from pathlib import Path
 
-from delegation_guard.wire import Ed25519Signer, Ed25519Verifier
+from attenu_guard.wire import Ed25519Signer, Ed25519Verifier
 
 __all__ = ["RevisionError", "head", "log", "revision_hash", "build_revision", "sign_revision", "verify_revision",
            "apply_revision", "commit", "diff", "get_ceiling", "set_ceiling", "ensure_initialized"]

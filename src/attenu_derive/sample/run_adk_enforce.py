@@ -24,7 +24,7 @@ import sys
 import time
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, RowLimit, EgressRank, identity
+from attenu_guard import Authority, Guard, RowLimit, EgressRank, identity
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
@@ -53,7 +53,7 @@ def tool_authorities(agent, domain: dict, *, grants=frozenset(), held=frozenset(
     looking like over-reach. A curated tier-2 tool without a grant (or a scope the operator held back) is declared
     `held_pending_grant`: the shim still denies it (the scope is absent from the installation authority), but the
     ledger and the denial say "waiting on you", not "stopped"."""
-    from delegation_guard.adapters.google_adk import ToolAuthority
+    from attenu_guard.adapters.google_adk import ToolAuthority
     try:
         from google.adk.tools.agent_tool import AgentTool
     except Exception:  # noqa: BLE001 - tests may pass plain stand-ins without google.adk on the path
@@ -101,7 +101,7 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     from google.adk.runners import Runner
     from google.adk.sessions.in_memory_session_service import InMemorySessionService
     from google.genai import types
-    from delegation_guard.adapters.google_adk import DelegationGuardPlugin
+    from attenu_guard.adapters.google_adk import DelegationGuardPlugin
 
     from attenu_derive import license
     license.require("enforce", identity.find_product_dir())        # the licence gate — at START, never mid-run
@@ -138,7 +138,7 @@ def run(app_dir: Path, prompt: str, *, domain_name: str, grants: set[str], model
     chain_id = identity.new_chain_id("adk")
     issue_kwargs = {}
     if product_dir is not None:
-        from delegation_guard.sinks import SpoolSink
+        from attenu_guard.sinks import SpoolSink
         from attenu_derive.product import note_run
         note_run(product_dir, identity.boot_id(), framework="google-adk", mode="enforce")
         issue_kwargs = {"chain_id": chain_id, "audit_path": identity.ledger_path(product_dir, chain_id),

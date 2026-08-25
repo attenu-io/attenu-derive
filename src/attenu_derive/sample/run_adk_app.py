@@ -1,7 +1,7 @@
 """
 attenu-sample — run a REAL Google ADK application (any package exposing `root_agent`, e.g. google/adk-samples)
 in observe mode: every delegation and tool call of the app's OWN agents and tools is recorded through the
-delegation-guard audit log (redacted at capture, ADR-05) and exported as corpus rows, so shadow mode can then
+attenu-guard audit log (redacted at capture, ADR-05) and exported as corpus rows, so shadow mode can then
 say what Attenu would have blocked on that real workload. This is G2's "real projects" done on the project's
 own agents, tools and prompts — not on a workload shape we invented.
 
@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from delegation_guard import Authority, Guard, __version__ as DG_VERSION
+from attenu_guard import Authority, Guard, __version__ as DG_VERSION
 
 from attenu_derive import __version__ as AD_VERSION
 from attenu_derive.corpus.export import _task_features, audit_to_corpus_rows
@@ -121,7 +121,7 @@ def override_models(root, model: str) -> dict:
 
 
 def make_plugin(salt: str, root_name: str):
-    from delegation_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
+    from attenu_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
     root = Guard.issue(root_name, OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     plugin = DelegationGuardPlugin(root, root_agent_name=root_name, delegations={}, tools={},
                                    default_tool_authority=lambda name: ToolAuthority(f"observe.{name}", lambda a: extract_features(a, salt=salt)),
@@ -185,7 +185,7 @@ def main(argv=None) -> int:
     out = Path(args.out)
     for d in ("corpus", "mirror", f"runs/{run_id}"): (out / d).mkdir(parents=True, exist_ok=True)
     run_meta = {"project": project, "framework": "google-adk", "app": str(app_dir.name), "model": args.model, "seed": 0, "salt": salt,
-                "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION, "python": platform.python_version()}}
+                "versions": {"attenu-derive": AD_VERSION, "attenu-guard": DG_VERSION, "python": platform.python_version()}}
     corpus_rows, mirror_rows, per_task = [], [], []; stopped_by = None
     worst = estimate_cost(args.model, args.max_input_tokens, 4_000)
     for i, prompt in enumerate(prompts):

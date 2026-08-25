@@ -31,7 +31,7 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from delegation_guard import Authority, EgressRank, RowLimit
+from attenu_guard import Authority, EgressRank, RowLimit
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
 from attenu_derive.derive.propose import Deriver, DelegationEvent, FRAMEWORK_TOOLS, spec_to_authority, subagent_tools_for, tools_for

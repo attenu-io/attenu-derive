@@ -12,8 +12,8 @@ import json
 import os
 from pathlib import Path
 
-from delegation_guard import AuditLog, evidence, identity
-from delegation_guard.wire import HS256TestSigner
+from attenu_guard import AuditLog, evidence, identity
+from attenu_guard.wire import HS256TestSigner
 
 __all__ = ["write_evidence", "effective_grants", "product_meta", "AnchorScheduler"]
 

@@ -95,11 +95,11 @@ def cmd_onboard(args) -> int:
 
 
 def cmd_verify(args) -> int:
-    from delegation_guard import evidence
-    from delegation_guard.wire import HS256TestSigner
+    from attenu_guard import evidence
+    from attenu_guard.wire import HS256TestSigner
     bundle = json.loads(Path(args.bundle).read_text())
     if getattr(args, "pubkey", None):
-        from delegation_guard.wire import Ed25519Verifier
+        from attenu_guard.wire import Ed25519Verifier
         signer = Ed25519Verifier(bytes.fromhex(args.pubkey), kid=args.kid)           # public key only: an auditor needs no secret
     elif args.hs256_key:
         signer = HS256TestSigner(secret=bytes.fromhex(args.hs256_key), kid=args.kid)

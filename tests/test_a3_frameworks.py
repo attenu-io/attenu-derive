@@ -3,7 +3,7 @@ runs (held payment denied, offline-verifiable) are in the eval card; these CI-sa
 travel-booking domain (T16 over-reach blocked / T17 no widening) and the a3 runners' importability + pack."""
 from attenu_derive.catalog.coverage import load_domain
 from attenu_derive.derive.propose import Deriver, DelegationEvent
-from delegation_guard import Authority
+from attenu_guard import Authority
 
 
 def _ev(task, tools, parent):
@@ -33,7 +33,7 @@ def test_t17_injection_no_widening_on_travel_domain():
 
 def test_t16_overreach_blocked_on_travel_booker():
     """A booker derived with only reads (payment held) has any payment/mail/write over-reach denied by the shim."""
-    from delegation_guard import Guard
+    from attenu_guard import Guard
     ov = load_domain("travel-booking")
     granted, _ = Deriver(domain=ov).propose(_ev("Search flights and weather", ["search_flights", "get_weather", "book_flight"],
                                                 Authority({"data.read"}, [], ttl=None)))

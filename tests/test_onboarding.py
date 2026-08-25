@@ -3,7 +3,7 @@ shipped kit alone (money tools withheld, unknowns fail-closed), and a curated do
 with the money tools held pending an operator grant."""
 from attenu_derive.catalog.coverage import load_catalog, load_domain, coverage
 from attenu_derive.derive.propose import Deriver, DelegationEvent
-from delegation_guard import Authority
+from attenu_guard import Authority
 
 TOOLS = ["create_reservation", "process_payment", "payment_choice", "event_booking_check", "flight_status_check",
          "weather_impact_check", "memorize", "google_search", "google_search_grounding"]

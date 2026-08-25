@@ -6,13 +6,13 @@ paths assume the packaged `attenu` CLI (installs from a wheel, no source tree).*
 ## Install
 
     pip install attenu_derive-<version>-py3-none-any.whl   # private wheel, supplied with the pilot pack
-    # (brings delegation-guard, the enforcement library, as a dependency)
+    # (brings attenu-guard, the enforcement library, as a dependency)
     attenu --version
 
 ## 1. Shadow first (zero risk)
 
-Run your app with the delegation-guard adapter for your framework in **observe** mode (see
-`delegation-guard` adapter docs). It records every delegation + tool call to the audit ledger, redacted at
+Run your app with the attenu-guard adapter for your framework in **observe** mode (see
+`attenu-guard` adapter docs). It records every delegation + tool call to the audit ledger, redacted at
 capture (names, scope classes, quantity buckets, salted hashes — never values). Nothing is blocked.
 
 ## 2. Day-0 coverage + a draft pack
@@ -40,7 +40,7 @@ the ledger.
 
 ## 5. Export + verify evidence (offline)
 
-    # the app exports a bundle from its audit log (delegation_guard.evidence.export_bundle)
+    # the app exports a bundle from its audit log (attenu_guard.evidence.export_bundle)
     attenu verify bundle.json --pubkey <hex>           # --hs256-key is the offline TEST signer only — never the auditor path
 
 Returns `{integrity, monotonicity, containment}`. An auditor runs this against the bundle **with no access

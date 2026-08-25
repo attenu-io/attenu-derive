@@ -14,9 +14,9 @@ from __future__ import annotations
 import json
 import os
 
-from delegation_guard import Authority, Guard, RowLimit, EgressRank
-from delegation_guard.adapters.langchain import GuardedDelegation, ToolPolicy
-from delegation_guard.wire import HS256TestSigner
+from attenu_guard import Authority, Guard, RowLimit, EgressRank
+from attenu_guard.adapters.langchain import GuardedDelegation, ToolPolicy
+from attenu_guard.wire import HS256TestSigner
 
 TRAVEL_TOOLS = {
     "search_flights": {"scope": "data.read", "tier": 0},
@@ -31,7 +31,7 @@ def _booker_authority(operator_grants: set[str]) -> Authority:
 
 
 def run(task_text: str, *, grants: set[str], model: str = "claude-haiku-4-5-20251001", recursion_limit: int = 20):
-    from attenu_derive import license; from delegation_guard import identity as _idn
+    from attenu_derive import license; from attenu_guard import identity as _idn
     license.require("enforce", _idn.find_product_dir())   # the licence gate — at START, never mid-run
     from langchain_anthropic import ChatAnthropic
     from langchain_core.tools import tool
@@ -72,7 +72,7 @@ def run(task_text: str, *, grants: set[str], model: str = "claude-haiku-4-5-2025
     except Exception as exc:                                   # noqa: BLE001
         status = f"error: {type(exc).__name__}: {str(exc)[:100]}"
     entries = root.audit_log().entries
-    from delegation_guard import evidence
+    from attenu_guard import evidence
     signer = HS256TestSigner(secret=os.urandom(16), kid="a3")
     bundle = evidence.export_bundle(root.audit_log(), signer, redact_task=True)
     return {"task": task_text, "status": status, "framework": "langgraph/deepagents",

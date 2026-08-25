@@ -1,7 +1,7 @@
 """
 attenu-sample — observe-mode sampling of a deepagents (LangChain) deep agent over a real
 repository, with a real model. Records every delegation and tool call through the
-delegation-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
+attenu-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
 
     python -m attenu_derive.sample.run_deepagents --repo <path> --out data/ \
         --model claude-haiku-4-5-20251001 --tasks tasks/repo-research.txt
@@ -26,8 +26,8 @@ import sys
 import time
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, __version__ as DG_VERSION
-from delegation_guard.adapters.langchain import GuardedDelegation, ToolPolicy
+from attenu_guard import Authority, Guard, __version__ as DG_VERSION
+from attenu_guard.adapters.langchain import GuardedDelegation, ToolPolicy
 
 from attenu_derive import __version__ as AD_VERSION
 from attenu_derive.corpus.export import audit_to_corpus_rows
@@ -238,7 +238,7 @@ def main(argv=None) -> int:
     out = Path(args.out); (out / "corpus").mkdir(parents=True, exist_ok=True)
     (out / "mirror").mkdir(exist_ok=True); (out / "runs" / run_id).mkdir(parents=True, exist_ok=True)
     run_meta = {"project": project, "framework": "langchain/deepagents", "model": args.model, "seed": 0,
-                "salt": salt, "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION,
+                "salt": salt, "versions": {"attenu-derive": AD_VERSION, "attenu-guard": DG_VERSION,
                                             "python": platform.python_version()}}
 
     corpus_rows, mirror_rows, per_task = [], [], []; stopped_by = None

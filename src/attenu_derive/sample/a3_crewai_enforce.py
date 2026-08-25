@@ -16,9 +16,9 @@ import os
 
 os.environ.setdefault("OTEL_SDK_DISABLED", "true"); os.environ.setdefault("CREWAI_DISABLE_TELEMETRY", "true"); os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
 
-from delegation_guard import Authority, Guard, RowLimit, EgressRank
-from delegation_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
-from delegation_guard.wire import HS256TestSigner
+from attenu_guard import Authority, Guard, RowLimit, EgressRank
+from attenu_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
+from attenu_guard.wire import HS256TestSigner
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
 
@@ -43,7 +43,7 @@ def _authorities(operator_grants: set[str]):
 
 
 def run(task_text: str, *, grants: set[str], model: str = "anthropic/claude-haiku-4-5-20251001", max_iter: int = 6):
-    from attenu_derive import license; from delegation_guard import identity as _idn
+    from attenu_derive import license; from attenu_guard import identity as _idn
     license.require("enforce", _idn.find_product_dir())   # the licence gate — at START, never mid-run
     from crewai import Agent, Crew, LLM, Process, Task
     from crewai.hooks import clear_all_global_hooks
@@ -89,7 +89,7 @@ def run(task_text: str, *, grants: set[str], model: str = "anthropic/claude-haik
         status = f"error: {type(exc).__name__}: {str(exc)[:100]}"
     entries = root.audit_log().entries
     denies = [{"scope": e.get("scope"), "reason": e.get("reason")} for e in entries if e.get("event") == "deny"]
-    from delegation_guard import evidence
+    from attenu_guard import evidence
     signer = HS256TestSigner(secret=os.urandom(16), kid="a3")
     bundle = evidence.export_bundle(root.audit_log(), signer, redact_task=True)
     return {"task": task_text, "status": status, "calls_attempted": [c[0] for c in calls],

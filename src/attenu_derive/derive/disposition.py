@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from delegation_guard import Disposition
+from attenu_guard import Disposition
 
 from attenu_derive.catalog.coverage import resolve
 

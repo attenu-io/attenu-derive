@@ -1,7 +1,7 @@
 # Attenu derivation engine — threat model
 
 *Status: draft, 2026-08-18. Scope: the derivation engine (`attenu-derive`) and its trust boundary with
-the enforcement shim (`delegation-guard`). Required before P3 (enforce) per the plan of record. Numbers
+the enforcement shim (`attenu-guard`). Required before P3 (enforce) per the plan of record. Numbers
 cited are reproducible from the committed corpus and eval gates (see "Evidence").*
 
 Attenu derives the **minimal enforceable authority** for an AI-agent delegation (a task + the tools

@@ -65,7 +65,7 @@ def test_unknown_tools_policy_default_deny_then_heuristic(tmp_path, monkeypatch)
     unresolved). `heuristic` lets the catalog's NAME heuristics grant tier-0/1 families (reads, plain writes);
     tier-2 (money, mail, delete, exec) is ALWAYS withheld by a heuristic — that is a standing decision."""
     from attenu_derive.sample.demo_local import run_demo
-    from delegation_guard import evidence
+    from attenu_guard import evidence
     monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "T")
     assert product.get_policy(tmp_path / "proj") == {"unknown_tools": "deny"}
     rep = run_demo(tmp_path / "proj")

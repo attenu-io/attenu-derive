@@ -13,8 +13,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from delegation_guard import Authority, Guard
-from delegation_guard.adapters.langchain import GuardedDelegation, ToolPolicy
+from attenu_guard import Authority, Guard
+from attenu_guard.adapters.langchain import GuardedDelegation, ToolPolicy
 
 from attenu_derive.sample.run_deepagents import BudgetExceeded, _BudgetGuard, estimate_cost
 

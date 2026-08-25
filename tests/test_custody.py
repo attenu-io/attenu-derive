@@ -27,8 +27,8 @@ class StubKMS:
 
 
 def test_kms_signer_anchors_and_the_bundle_verifies_with_the_public_key_only(tmp_path, monkeypatch):
-    from delegation_guard import Authority, Guard, evidence
-    from delegation_guard.wire import ECDSAP256Verifier
+    from attenu_guard import Authority, Guard, evidence
+    from attenu_guard.wire import ECDSAP256Verifier
     kms = StubKMS(); signer = KMSSigner(kms, key_id="arn:aws:kms:eu-west-1:123:key/abc", kid="kms-abc")
     g = Guard.issue("a", Authority({"crm.read"}, [], ttl=None), task="t"); g.check("crm.read", tool="q")
     bundle = evidence.export_bundle(g.audit_log(), signer)
@@ -50,14 +50,14 @@ def test_init_with_kms_anchor_stores_only_the_public_key_and_loads_the_right_sig
     assert isinstance(s, KMSSigner) and v.verify(b"m", s.sign(b"m"))
     # the demo runs end to end on a KMS-anchored product and the bundle verifies with the public key only
     from attenu_derive.sample.demo_local import run_demo
-    from delegation_guard import evidence
+    from attenu_guard import evidence
     rep = run_demo(tmp_path / "proj")
     assert evidence.verify_bundle(json.loads(Path(rep["bundle_path"]).read_text()), v)["ok"] is True
 
 
 def test_anchor_scheduler_anchors_out_of_band_and_on_stop(tmp_path, monkeypatch):
     from attenu_derive.evidence_out import AnchorScheduler
-    from delegation_guard import Authority, Guard, evidence, identity
+    from attenu_guard import Authority, Guard, evidence, identity
     monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home")); product.init_product(tmp_path / "proj", "T")
     cid = identity.new_chain_id("long")
     g = Guard.issue("a", Authority({"crm.read"}, [], ttl=None), task="t", chain_id=cid, audit_path=identity.ledger_path(tmp_path / "proj", cid))

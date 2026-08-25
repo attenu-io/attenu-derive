@@ -24,7 +24,7 @@ scopes:
   - agent.message
   - state.write        # internal scratch state (todos), not a resource
   - device.actuate     # physical / local device actuation incl. media playback (vehicle, appliance, smart-home) — tier 1 (T7, from BFCL traffic)
-ceilings:            # existing delegation-guard types only
+ceilings:            # existing attenu-guard types only
   - RowLimit
   - SpendCap
   - CallLimit          # may be SCOPED: CallLimit(max, applies_to=<scope|pattern>) — key max_calls[<scope>], auto-metered per node+pattern by the Guard (shim >= 0.3)

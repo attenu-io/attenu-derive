@@ -15,7 +15,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from delegation_guard import evidence
+from attenu_guard import evidence
 
 __all__ = ["render_chain_report", "render_product_report", "write_chain_report"]
 

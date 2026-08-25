@@ -23,8 +23,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, RowLimit, EgressRank, StrikePolicy, identity
-from delegation_guard.sinks import SpoolSink
+from attenu_guard import Authority, Guard, RowLimit, EgressRank, StrikePolicy, identity
+from attenu_guard.sinks import SpoolSink
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions

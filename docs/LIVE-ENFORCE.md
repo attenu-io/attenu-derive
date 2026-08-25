@@ -62,7 +62,7 @@ finance-advisory [--hold web.search | --grant web.search] --model anthropic/clau
 ## Offline-verifiable evidence bundle (T33a)
 
 Every enforce run exports an evidence bundle (the hash-chained ledger + a signed anchor) and re-verifies it
-from the bundle ALONE — no engine — via `delegation_guard.evidence.verify_bundle`. On the live customer-service
+from the bundle ALONE — no engine — via `attenu_guard.evidence.verify_bundle`. On the live customer-service
 benign run above the offline verifier returned `{integrity: true, monotonicity: true, containment: true}` with
 **3 authorized actions re-checked** against the acting node's authority; a deliberately altered bundle fails
 each check independently (`tests/test_core_v02.py`). `delegation_graph(bundle)` renders the chain (agents,

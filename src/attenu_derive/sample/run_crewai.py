@@ -1,7 +1,7 @@
 """
 attenu-sample — observe-mode sampling of a CrewAI crew (orchestrator + specialist coworkers via CrewAI's
 own `Delegate work to coworker` tool) over a real repository, with Anthropic Haiku through `crewai.LLM`.
-Records every delegation and tool call through the delegation-guard audit log (redacted at capture,
+Records every delegation and tool call through the attenu-guard audit log (redacted at capture,
 ADR-05) and exports corpus rows. 4th and last framework of the G2 quartet (T15).
 
     python -m attenu_derive.sample.run_crewai --repo <path> --out data/ --limit 2
@@ -32,7 +32,7 @@ from typing import Optional
 
 os.environ.setdefault("OTEL_SDK_DISABLED", "true"); os.environ.setdefault("CREWAI_DISABLE_TELEMETRY", "true"); os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
 
-from delegation_guard import Authority, Guard, __version__ as DG_VERSION
+from attenu_guard import Authority, Guard, __version__ as DG_VERSION
 
 from attenu_derive import __version__ as AD_VERSION
 from attenu_derive.corpus.export import _task_features, audit_to_corpus_rows
@@ -135,7 +135,7 @@ class BudgetHook:
 
 def make_bridge(salt: str):
     """(root Guard, observe-mode CrewAIGuardBridge): every tool call recorded with the redacted feature context."""
-    from delegation_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
+    from attenu_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
     root = Guard.issue("orchestrator", OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     bridge = CrewAIGuardBridge(
         root_guard=root, root_role="orchestrator", tool_policies={}, delegation_authorities={},
@@ -229,7 +229,7 @@ def main(argv=None) -> int:
     out = Path(args.out)
     for d in ("corpus", "mirror", f"runs/{run_id}"): (out / d).mkdir(parents=True, exist_ok=True)
     run_meta = {"project": project, "framework": "crewai", "model": args.model, "seed": 0, "salt": salt,
-                "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION, "python": platform.python_version()}}
+                "versions": {"attenu-derive": AD_VERSION, "attenu-guard": DG_VERSION, "python": platform.python_version()}}
     corpus_rows, mirror_rows, per_task = [], [], []
     for i, task in enumerate(tasks):
         t0 = time.time()

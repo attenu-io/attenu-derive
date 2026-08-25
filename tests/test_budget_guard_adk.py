@@ -20,8 +20,8 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
-from delegation_guard import Authority, Guard
-from delegation_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
+from attenu_guard import Authority, Guard
+from attenu_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
 
 from attenu_derive.sample.run_adk import BudgetExceeded, BudgetPlugin, estimate_cost, make_plugin
 

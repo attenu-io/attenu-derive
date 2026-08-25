@@ -26,7 +26,7 @@ from collections import Counter, defaultdict
 from dataclasses import replace
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, ReasonCode
+from attenu_guard import Authority, Guard, ReasonCode
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
 from attenu_derive.derive.propose import Deriver, event_from_row, spec_to_authority

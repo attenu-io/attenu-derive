@@ -15,8 +15,8 @@ from crewai.hooks import clear_all_global_hooks
 from crewai.llms.base_llm import BaseLLM
 from crewai.tools import tool
 
-from delegation_guard import Authority, Guard
-from delegation_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
+from attenu_guard import Authority, Guard
+from attenu_guard.adapters.crewai import CrewAIGuardBridge, ToolPolicy
 
 from attenu_derive.sample.run_crewai import BudgetExceeded, BudgetHook, estimate_cost, make_bridge
 

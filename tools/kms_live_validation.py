@@ -8,8 +8,8 @@ import json, sys, tempfile
 from pathlib import Path
 
 from attenu_derive.signers import KMSSigner, kms_client
-from delegation_guard.wire import ECDSAP256Verifier
-from delegation_guard import evidence
+from attenu_guard.wire import ECDSAP256Verifier
+from attenu_guard import evidence
 
 KEY_ID = sys.argv[1]
 client = kms_client("us-east-1")
@@ -22,7 +22,7 @@ assert signer.verify(msg, sig), "HSM signature did not verify"
 assert not signer.verify(b"tampered", sig), "tampered message verified (!)"
 
 # 2) a REAL ledger anchored via KMS, then verified offline from the bundle alone
-from delegation_guard import Guard, Authority
+from attenu_guard import Guard, Authority
 tmp = Path(tempfile.mkdtemp())
 g = Guard.issue("root", Authority(scopes={"data.read", "mail.send"}), audit_path=tmp / "ledger.jsonl")
 g.check("data.read", tool="read_db")

@@ -1,6 +1,6 @@
 """T2: derive/ v0 — L1 templates + L2 catalog + L4 fail-closed. No model, no network."""
 import time
-from delegation_guard import Authority, Guard, RowLimit, EgressRank
+from attenu_guard import Authority, Guard, RowLimit, EgressRank
 from attenu_derive.derive.propose import Deriver, DelegationEvent
 
 PARENT = Authority({"fs.*", "agent.delegate.*", "agent.message", "web.fetch"}, [RowLimit(100_000), EgressRank("any")], ttl=3600)

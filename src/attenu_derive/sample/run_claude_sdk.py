@@ -2,7 +2,7 @@
 attenu-sample — observe-mode sampling of a Claude Agent SDK session (subagents via the
 built-in `Agent` tool) over a real repository. Billed to the logged-in Claude Code
 subscription — no API key. Records every subagent spawn and tool call through the
-delegation-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
+attenu-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
 
     python -m attenu_derive.sample.run_claude_sdk --repo <path> --out data/ --model haiku
 
@@ -23,8 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-from delegation_guard import Authority, Guard, __version__ as DG_VERSION
-from delegation_guard.adapters.claude_sdk import AgentGrant, DelegationGuardRegistry, ToolPolicy
+from attenu_guard import Authority, Guard, __version__ as DG_VERSION
+from attenu_guard.adapters.claude_sdk import AgentGrant, DelegationGuardRegistry, ToolPolicy
 
 from attenu_derive import __version__ as AD_VERSION
 from attenu_derive.corpus.export import audit_to_corpus_rows
@@ -196,7 +196,7 @@ def main(argv=None) -> int:
     for d in ("corpus", "mirror", f"runs/{run_id}"):
         (out / d).mkdir(parents=True, exist_ok=True)
     run_meta = {"project": project, "framework": "claude-agent-sdk", "model": args.model, "seed": 0, "salt": salt,
-                "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION, "python": platform.python_version()}}
+                "versions": {"attenu-derive": AD_VERSION, "attenu-guard": DG_VERSION, "python": platform.python_version()}}
 
     corpus_rows, mirror_rows, per_task = [], [], []
     for i, task in enumerate(tasks):

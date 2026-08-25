@@ -66,7 +66,7 @@ def test_envelope_handles_negative_quantities():
 
 def test_export_marks_completed_from_done_events():
     """T21 leak 2: per-node lifecycle end (shim `Guard.complete()` -> `done`) reaches the corpus row as `completed`."""
-    from delegation_guard import Authority, Guard
+    from attenu_guard import Authority, Guard
     from attenu_derive.corpus.export import audit_to_corpus_rows
     root = Guard.issue("orchestrator", Authority({"observe.*", "agent.delegate.*"}, [], ttl=None), task="t")
     a = root.delegate("researcher", Authority({"observe.*"}, [], ttl=None), task="explore")

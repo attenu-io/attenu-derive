@@ -6,7 +6,7 @@ from pathlib import Path
 
 from attenu_derive import product, report
 from attenu_derive.sample.demo_local import run_demo
-from delegation_guard import evidence
+from attenu_guard import evidence
 
 
 def _chain(tmp_path, monkeypatch, scenario="fanout"):

@@ -33,8 +33,8 @@ def test_cli_coverage_and_onboard_run(tmp_path, capsys):
 
 
 def test_cli_verify_a_real_bundle(tmp_path, capsys):
-    from delegation_guard import Authority, Guard, evidence
-    from delegation_guard.wire import HS256TestSigner
+    from attenu_guard import Authority, Guard, evidence
+    from attenu_guard.wire import HS256TestSigner
     key = os.urandom(16); signer = HS256TestSigner(secret=key, kid="k1")
     root = Guard.issue("o", Authority({"crm.read", "agent.delegate.s"}, [], ttl=None), task="t")
     root.delegate("s", Authority({"crm.read"}, [], ttl=None), task="x").check("crm.read", tool="q")
@@ -56,7 +56,7 @@ def test_cli_verify_with_a_public_key(tmp_path, monkeypatch, capsys):
     import json
     from attenu_derive import product
     from attenu_derive.cli import main
-    from delegation_guard import Authority, Guard, evidence
+    from attenu_guard import Authority, Guard, evidence
     monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
     meta = product.init_product(tmp_path / "proj", "CS")
     g = Guard.issue("a", Authority({"crm.read"}, [], ttl=None), task="t"); g.check("crm.read", tool="q")

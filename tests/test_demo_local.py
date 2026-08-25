@@ -8,7 +8,7 @@ import pytest
 
 from attenu_derive import product
 from attenu_derive.sample.demo_local import run_demo
-from delegation_guard import evidence
+from attenu_guard import evidence
 
 
 def test_demo_writes_a_real_ledger_with_a_held_payment_denied_in_a_chain(tmp_path, monkeypatch):

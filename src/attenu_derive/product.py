@@ -15,7 +15,7 @@ import secrets
 import time
 from pathlib import Path
 
-from delegation_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
+from attenu_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
 
 __all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
            "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "remove_grant", "grant_key", "note_run", "run_meta",

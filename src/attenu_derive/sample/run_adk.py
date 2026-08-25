@@ -2,7 +2,7 @@
 attenu-sample — observe-mode sampling of a Google ADK agent tree (orchestrator + specialist
 sub-agents via `AgentTool`) over a real repository, with Gemini Flash (Google AI Studio free
 tier by default; `GOOGLE_API_KEY`). Records every delegation and tool call through the
-delegation-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
+attenu-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
 
     python -m attenu_derive.sample.run_adk --repo <path> --out data/ --model gemini-2.5-flash --limit 2
 
@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from delegation_guard import Authority, Guard, __version__ as DG_VERSION
+from attenu_guard import Authority, Guard, __version__ as DG_VERSION
 
 from attenu_derive import __version__ as AD_VERSION
 from attenu_derive.corpus.export import _task_features, audit_to_corpus_rows
@@ -116,7 +116,7 @@ class BudgetPlugin(_lazy_adk()):
 
 def make_plugin(salt: str):
     """(root Guard, observe-mode DelegationGuardPlugin): every tool call recorded with the redacted feature context."""
-    from delegation_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
+    from attenu_guard.adapters.google_adk import DelegationGuardPlugin, ToolAuthority
     root = Guard.issue("orchestrator", OBSERVE, task="sample", max_depth=8, max_fanout=10_000)
     plugin = DelegationGuardPlugin(
         root, root_agent_name="orchestrator", delegations={}, tools={},
@@ -234,7 +234,7 @@ def main(argv=None) -> int:
     for d in ("corpus", "mirror", f"runs/{run_id}"):
         (out / d).mkdir(parents=True, exist_ok=True)
     run_meta = {"project": project, "framework": "google-adk", "model": args.model, "seed": 0, "salt": salt,
-                "versions": {"attenu-derive": AD_VERSION, "delegation-guard": DG_VERSION, "python": platform.python_version()}}
+                "versions": {"attenu-derive": AD_VERSION, "attenu-guard": DG_VERSION, "python": platform.python_version()}}
 
     corpus_rows, mirror_rows, per_task = [], [], []
     for i, task in enumerate(tasks):
