@@ -108,15 +108,13 @@ quantity buckets and salted hashes — an export fails rather than ship a field 
 recognise. Custody is yours: the anchor key is product-local by default; KMS/HSM custody is
 validated against a real key (`docs/OPS-RUNBOOK.md`).
 
-## Who else does this
+## What is different
 
-Cryptographically attenuated delegation tokens exist elsewhere — [Tenuo](https://github.com/tenuo-ai/tenuo)
-and [Keel](https://github.com/keelapi/keel-permit) both ship the child ⊆ parent mechanism, and it is
-on the IETF's table. Policy-from-plain-language exists too (Omnigent; Kastra's Recon drafts rules
-from history). What this engine does that we have not found elsewhere is take its input from the
-application's declared structure and observed calls rather than from a person, keep the result
-inside the guard's meet so it can only narrow, and hand the auditor a bundle that verifies with the
-vendor absent. If you know of another, open an issue — we would rather cite it than claim.
+Three things, in this order. The **input is the application** — declared agents, roster, tools, observed
+calls — not a person writing or describing a policy. The result lives **inside the guard's meet**, so a
+derived permission set can only narrow what the parent holds and an engine error can only over-restrict —
+across every sub-agent handoff. And the **evidence verifies with the vendor absent**: the auditor checks
+integrity, child ⊆ parent and containment from the exported bundle alone.
 
 ## Layout
 
