@@ -22,8 +22,7 @@ residual. Findings are triaged Pass / Concern / Action.
   are barred from tier-2 (I4), so an un-reviewed error is bounded to tier-0/1. *Action (Phase A/B):* the
   `attenu onboard` scaffold marks every entry `_review` and auto-flags tier-2 `requires_grant`, so a curated
   mistake requires the operator to both edit the scope *and* remove the grant flag — two deliberate steps.
-- **CONCERN — I3 ledger integrity depends on the anchor key.** The chain is tamper-*evident*, not
-  tamper-proof; detection depends on an out-of-band anchor (ADR-14). *Mitigation:* `verify_anchor` + the
+- **CONCERN — I3 ledger integrity depends on the anchor key.** The chain is tamper-*evident* (not tamper-proof); detection depends on an out-of-band anchor (ADR-14). *Mitigation:* `verify_anchor` + the
   offline `evidence.verify_bundle` catch a full rewrite. *Action (Phase B):* key management / anchor custody
   is a deployment decision, not yet a product feature.
 - **ACTION — solo review is not external.** This pass is internal by construction. An external red-team on the

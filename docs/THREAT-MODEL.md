@@ -16,7 +16,7 @@ is written for a security reviewer, not for marketing: every guarantee names its
 | A1 | The **authority granted to each agent** at runtime | Over-grant = an agent can act beyond its task; the product's entire value is that this cannot happen |
 | A2 | The **tamper-evident audit ledger** (hash-chained `root/spawn/allow/deny/kill/done`) | The record a regulator or incident responder relies on; if forgeable, evidence is worthless |
 | A3 | The **sampled corpus** (delegation traces used to build/evaluate the engine) | Contains the shapes of customer workflows; a leak of raw values would expose customer data |
-| A4 | The **catalog + templates** shipped as the day-0 kit | A poisoned catalog entry could silently widen authority for a whole tool family |
+| A4 | The **catalog + templates** shipped as the day-0 defaults | A poisoned catalog entry could silently widen authority for a whole tool family |
 
 ## 2. Trust boundaries and actors
 
@@ -107,7 +107,7 @@ salted hashes. No argument value, key, or payload is written to the shipped corp
   failure mode is denial, not over-grant. Mitigated by shadow-first rollout (would-deny, block nothing)
   and the benign-deny gate (hold-out ≤ 2%); measured continuously. A new domain's tool that resolves
   only to a withheld tier-2 family is *held pending curation* — visible, not silently denied — and the
-  day-0 kit must surface that state distinctly. **Closed at the ledger (2026-08-19, console slice 1):**
+  day-0 defaults must surface that state distinctly. **Closed at the ledger (2026-08-19, console slice 1):**
   every `deny` carries a `disposition` (`held_pending_grant` · `withheld_tier2` · `unresolved` ·
   `out_of_authority`) stated by `derive.disposition.tool_dispositions()` and recorded by the shim; the
   denial handed to the model carries the same word; undeclared tools land on the ledger as `unresolved` in

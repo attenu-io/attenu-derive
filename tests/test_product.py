@@ -61,7 +61,7 @@ def test_product_pack_declares_a_tool_and_merges_over_the_domain(tmp_path, monke
 
 
 def test_unknown_tools_policy_default_deny_then_heuristic(tmp_path, monkeypatch):
-    """Rafael: 'where can I define default actions for unknowns?' -> the product policy. Default = deny (fail-closed,
+    """Reviewer: 'where can I define default actions for unknowns?' -> the product policy. Default = deny (fail-closed,
     unresolved). `heuristic` lets the catalog's NAME heuristics grant tier-0/1 families (reads, plain writes);
     tier-2 (money, mail, delete, exec) is ALWAYS withheld by a heuristic — that is a standing decision."""
     from attenu_derive.sample.demo_local import run_demo

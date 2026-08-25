@@ -5,7 +5,7 @@ paths assume the packaged `attenu` CLI (installs from a wheel, no source tree).*
 
 ## Install
 
-    pip install attenu_derive-<version>-py3-none-any.whl   # private wheel, supplied with the pilot pack
+    pip install attenu-derive
     # (brings attenu-guard, the enforcement library, as a dependency)
     attenu --version
 

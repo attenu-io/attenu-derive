@@ -8,7 +8,7 @@ can be demonstrated anywhere:
 
 `basic`  — the A3 travel-booking story: a planner delegates to a booking agent; reads pass, the payment is HELD
            pending an operator grant, an unknown tool is UNRESOLVED.
-`fanout` — what a real multi-agent app looks like (Rafael: "I would expect more agents and tooling"): a trip planner
+`fanout` — what a real multi-agent app looks like (reviewer: "I would expect more agents and tooling"): a trip planner
            delegating to four specialists, two of which delegate further (9 agents, 18 tools); reads allowed; payments,
            reservations and mail HELD; an unknown tool UNRESOLVED; a read-only support agent exceeding its declared
            role → OUT OF AUTHORITY; a reviews scout that keeps calling an unknown tool is REVOKED by the strike policy

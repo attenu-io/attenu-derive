@@ -110,3 +110,17 @@ def test_cli_policy_show_and_set(tmp_path, monkeypatch, capsys):
     assert main(["policy", "--dir", str(tmp_path / "proj")]) == 0 and '"unknown_tools": "deny"' in capsys.readouterr().out
     assert main(["policy", "--dir", str(tmp_path / "proj"), "--unknown-tools", "heuristic"]) == 0
     assert '"unknown_tools": "heuristic"' in capsys.readouterr().out
+
+
+def test_cli_verify_defaults_to_the_products_anchor_key(tmp_path, monkeypatch, capsys):
+    """Inside a product directory, `attenu verify <bundle>` needs no key: the product's own anchor verifies it."""
+    from attenu_derive.cli import main
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    d = tmp_path / "proj"
+    assert main(["init", "--product", "T", "--dir", str(d)]) == 0
+    assert main(["demo", "--scenario", "fanout", "--dir", str(d)]) == 0
+    capsys.readouterr()
+    bundles = sorted((d / ".attenu" / "evidence").rglob("*.bundle.json"))
+    assert bundles, "the demo should have exported a bundle"
+    assert main(["verify", str(bundles[-1]), "--dir", str(d)]) == 0
+    assert '"ok": true' in capsys.readouterr().out

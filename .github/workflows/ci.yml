@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
-      # attenu-guard is a PRIVATE sibling repo: installed over SSH with a read-only
+      # attenu-guard is installed from its git repo until the PyPI release, over SSH with a read-only
       # deploy key (secret DG_DEPLOY_KEY on this repo; public half on attenu-guard).
       - name: Install
         env: { DG_DEPLOY_KEY: "${{ secrets.DG_DEPLOY_KEY }}" }

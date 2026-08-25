@@ -6,7 +6,7 @@ attenu-guard audit log (redacted at capture, ADR-05) and exports corpus rows.
 
     python -m attenu_derive.sample.run_adk --repo <path> --out data/ --model gemini-2.5-flash --limit 2
 
-Third G2 framework (Rafael's quartet: deepagents, Claude Agent SDK, CrewAI, ADK). Fan-out by
+Third G2 framework (the G2 quartet: deepagents, Claude Agent SDK, CrewAI, ADK). Fan-out by
 construction: one task -> 4 specialist delegations. Guardrails (PM decisions 2026-08-18): hard
 per-task INPUT-TOKEN budget counted across ALL agents (`BudgetPlugin.after_model_callback` fires
 for delegated agents too — proven by tests/test_budget_guard_adk.py), `RunConfig.max_llm_calls`,

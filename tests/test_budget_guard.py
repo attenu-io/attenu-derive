@@ -105,7 +105,7 @@ def test_estimate_cost_uses_public_prices():
     assert estimate_cost("claude-haiku-4-5-20251001", 0, 1_000_000) == 5.0
 
 
-# ---- G3 volume run (Rafael's go, 2026-08-18): honest cost + a hard USD ceiling per batch ------------------
+# ---- G3 volume run (the go decision, 2026-08-18): honest cost + a hard USD ceiling per batch ------------------
 def test_estimate_cost_is_cache_aware():
     from attenu_derive.sample.run_deepagents import estimate_cost, usage_from_callback
     # Haiku 4.5 list: input 1.00 / output 5.00 / cache read 0.10 / cache write 1.25 (USD per 1M)

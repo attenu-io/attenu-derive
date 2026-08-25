@@ -1,4 +1,4 @@
-# Onboarding a new app to Attenu (day-0 kit)
+# Onboarding a new app to Attenu (day-0 defaults)
 
 *The ≤1-hour path (G4) from a brand-new agent app to enforce mode. Measured on `travel-concierge` (G5,
 held out of all training) — see the walkthrough at the end.*
@@ -87,5 +87,5 @@ heuristic guess. A "judgement call" = day-0 was withheld or unresolved, or a tie
 So the curation burden is **~30% of an app's tools need a human decision, and it is front-loaded on the
 tier-2 / money tools** — exactly the ones a bank wants a human to decide anyway. Day-0 is safe before any of
 it (money withheld, unknowns fail-closed), and the wall-clock is minutes. This is the register's
-"curation-burden scales with customers" risk, now a number rather than a worry: it scales with an app's
+"curation-burden scales with adopters" risk, now a number rather than a worry: it scales with an app's
 *distinct sensitive tools*, not its traffic, and the scaffold does the mechanical 70%.

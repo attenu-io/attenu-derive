@@ -8,7 +8,7 @@ committed gold + the local corpus (mirrored to the private bucket).*
 
 ## Bounds and honest limitations (read first)
 
-- **G3 real-event volume is DEFERRED to real-customer data (Rafael's decision, 2026-08-19).** 438 real
+- **G3 real-event volume is DEFERRED to real-customer data (project decision, 2026-08-19).** 438 real
   delegation events against a 2,000 target; the normalized-dataset target (≥10,000) is met at 18,450. The
   2,000 was always a proxy for corpus richness bought from ourselves; the flywheel (customer-exported bundles,
   never background telemetry) supplies real volume once a design partner runs the loop. "Deferred to
@@ -48,7 +48,7 @@ committed gold + the local corpus (mirrored to the private bucket).*
 |---|---|---|---|
 | G1 | Derivation works on real tasks | **MET** (on 13 clean hold-out rows) | benign-deny 0.0, unused 5.8%, escalation 0 |
 | G2 | Protects real projects (enforce) | **MET** (ADK customer-domain; live) | 21/21: 0 benign blocks; over-reach 8,783/8,783; injection 0 widened; live single + chain; Haiku ≡ Sonnet |
-| G3 | Data flywheel / volume | **DEFERRED** (real events, Rafael) / MET (datasets) | 438 real events (target parked) · 18,450 / 10,000 dataset rows |
+| G3 | Data flywheel / volume | **DEFERRED** (real events, project decision) / MET (datasets) | 438 real events (target parked) · 18,450 / 10,000 dataset rows |
 | G4 | Production grade | **NEAR-COMPLETE** | packaged onboarding ≤1h MET; SDK/CLI + runbook + internal review done; graph-UI + service-mode outstanding |
 | G5 | Day-0 story | **MET** (out-of-sample) | held-out app: safe day-0, 100% curated in minutes |
 
@@ -76,7 +76,7 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
 ## G3 — data flywheel
 
 - Real corpus: **438 delegation events / 599 rows / 21 projects × 4 frameworks**. The ≥2,000 real-event target
-  is **DEFERRED to real-customer data** (Rafael, 2026-08-19): 2,000 bought from ourselves was a proxy; real
+  is **DEFERRED to real-customer data** (project decision, 2026-08-19): 2,000 bought from ourselves was a proxy; real
   volume arrives via the flywheel — **customer-initiated evidence-bundle export, never background telemetry**
   (the custody story is the thing a bank buys). The 25%-non-code amendment is parked with it.
 - Normalized datasets: **18,450 rows** (BFCL + hermes + ToolACE; target ≥ 10,000 — MET).
@@ -100,21 +100,10 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   product and is labelled `attenu-anchor-TEST`. Repro: shim `python tests/test_core_v02.py`,
   `python tests/test_sinks_identity.py`, `python tests/test_adapters_contract.py`; engine
   `python -m pytest -q tests/test_disposition.py tests/test_product.py tests/test_run_adk_enforce.py tests/test_cli.py`.
-- **Delegation-graph UI: DONE in local mode (2026-08-19, slice 1 / Plan B)** — the private `attenu-console` package
-  (`attenu ui`): products → chains → the delegation graph with denials by disposition + **verified ✓** (integrity ·
-  monotonicity · containment against the product's public key) → evidence download → **Decisions** (questions;
-  *Grant scope* writes `.attenu/grants.json`, which `run_adk_enforce` and `attenu demo` read — the loop closes).
-  Proven from a fresh venv with three wheels and no source tree; `attenu demo` (USD 0, no model) produces a real
-  anchored ledger so the demo never needs a key.
-- **Service mode / cloud deployment: BUILT (2026-08-19, slice 1 / Plan C)** — the same console in cloud mode
-  (`attenu-console`, one container, Postgres with RLS FORCEd for a non-owner role + negative tests per table):
-  accounts → products → environments → installations; self-serve expiring installation tokens (EdDSA, verified
-  OFFLINE by the optional `attenu_cloud.license` client against bundled public keys (the open engine has no gate); previously gated at START on the real enforce runners; observe
-  free); `attenu link` / `attenu sync` (spool drain keyed (installation, boot, chain, seq, hash), forks alerted,
-  allow-list re-validated on ingest, anchors append-only, content-free heartbeats, grants pulled); Installations +
-  Attenu admin. Verified end to end locally (token → link → sync → chains verified in the cloud) and from the built
-  image. **Not yet hosted** — needs the free accounts in `attenu-console/docs/DEPLOY.md` (Neon, Fly/Cloud Run,
-  WorkOS; Rafael).
+- **Delegation-graph UI and service mode** live in the optional Attenu console (https://attenu.io): the graph with
+  denials by disposition and the verified mark (integrity · monotonicity · containment against the product's public
+  key), evidence download, and Decisions. The open engine needs none of it; `attenu demo` produces a real anchored
+  ledger with no model and no key.
 - **Control with integrity (2026-08-19, slice 2):** every change to what a product may do (grants, declared tools,
   policy) is a **signed config revision** — hashed, parent-chained, verified before a runner applies it, refused beyond
   the product's **ceiling** and on conflict (last-known-good stays); the cloud's revisions are signed by the Attenu

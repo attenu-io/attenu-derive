@@ -98,7 +98,7 @@ def test_cli_config_log_and_ceiling(proj, capsys):
 
 
 def test_remove_grant_is_a_signed_revision_and_the_runners_stop_seeing_the_scope(proj):
-    """Rafael, 2026-08-19: 'after clicking grant scope there is no way to revert.' Reverting = a signed revision
+    """Reviewer feedback, 2026-08-19: 'after clicking grant scope there is no way to revert.' Reverting = a signed revision
     that removes the grant — same audit trail as granting; the materialized grants.json follows."""
     product.add_grant(proj, "payments.transfer"); product.add_grant(proj, "mail.send")
     assert product.remove_grant(proj, "payments.transfer") == {"mail.send"}

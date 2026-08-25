@@ -1,5 +1,5 @@
 """
-G3 volume driver (Rafael's go, 2026-08-18): sample MANY unsampled repos with the deepagents fan-out workload
+G3 volume driver (the go decision, 2026-08-18): sample MANY unsampled repos with the deepagents fan-out workload
 under a hard USD ceiling, tracking events + spend from the manifests, mirroring as it goes.
 
     python -m attenu_derive.sample.batch --repos <file: one org/repo per line> --max-usd 120 --shard 0/2

@@ -46,7 +46,7 @@ def test_enforce_runner_reads_product_grants(tmp_path, monkeypatch):
 
 
 def test_fanout_scenario_is_a_real_tree_with_every_disposition_and_a_strike_revocation(tmp_path, monkeypatch):
-    """Rafael: 'I would expect more agents and tooling.' The fan-out scenario: a planner delegating to four specialists,
+    """Reviewer: 'I would expect more agents and tooling.' The fan-out scenario: a planner delegating to four specialists,
     two of them delegating further (>= 8 agents, >= 16 distinct tools), reads allowed, payments HELD, an unknown tool
     UNRESOLVED, a role violation OUT OF AUTHORITY, and a sub-agent REVOKED by the strike policy after 3 same-scope
     denials — all on one anchored, offline-verifiable ledger. USD 0, no model."""

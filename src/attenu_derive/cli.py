@@ -104,7 +104,12 @@ def cmd_verify(args) -> int:
     elif args.hs256_key:
         signer = HS256TestSigner(secret=bytes.fromhex(args.hs256_key), kid=args.kid)
     else:
-        print("verify needs --pubkey <hex> (the product's anchor public key) or --hs256-key <hex> (test signer)", file=sys.stderr); return 2
+        from attenu_derive.product import load_anchor_verifier
+        try:
+            signer = load_anchor_verifier(Path(args.dir))          # the product's own anchor key, inside its directory
+        except Exception:  # noqa: BLE001
+            print("verify: no product in --dir (run inside the product directory, or pass --pubkey <hex> / --hs256-key <hex>)",
+                  file=sys.stderr); return 2
     rep = evidence.verify_bundle(bundle, signer)
     print(json.dumps(rep, indent=2))
     return 0 if rep["ok"] else 1
@@ -140,7 +145,7 @@ def cmd_ui(args) -> int:
     try:
         from attenu_console.cli import serve_main
     except ImportError:
-        print("attenu ui needs the console package: pip install attenu-console", file=sys.stderr); return 2
+        print("attenu ui needs the console package (attenu-console — see https://attenu.io)", file=sys.stderr); return 2
     return serve_main(["--dir", args.dir, "--port", str(args.port)] + (["--open"] if args.open else []))
 
 
@@ -148,7 +153,7 @@ def cmd_link(args) -> int:
     try:
         from attenu_cloud.client import link
     except ImportError:
-        print("attenu link needs the Attenu cloud client: pip install attenu-console (optional; nothing else needs it)", file=sys.stderr); return 2
+        print("attenu link needs the Attenu cloud client: the attenu-console package (optional; ships with the Attenu console — see https://attenu.io; nothing else needs it)", file=sys.stderr); return 2
     out = link(Path(args.dir), args.token, base_url=args.url, environment=args.env)
     print(json.dumps({k: out[k] for k in ("product_id", "environment", "base_url")}, indent=2)); return 0
 
@@ -158,7 +163,7 @@ def cmd_sync(args) -> int:
     try:
         from attenu_cloud.client import sync
     except ImportError:
-        print("attenu sync needs the Attenu cloud client: pip install attenu-console (optional; nothing else needs it)", file=sys.stderr); return 2
+        print("attenu sync needs the Attenu cloud client: the attenu-console package (optional; ships with the Attenu console — see https://attenu.io; nothing else needs it)", file=sys.stderr); return 2
     while True:
         rep = sync(Path(args.dir)); print(json.dumps(rep))
         if not args.watch:
@@ -228,7 +233,7 @@ def build_parser() -> argparse.ArgumentParser:
     o = sub.add_parser("onboard", help="day-0 report + a draft domain pack for the gaps")
     o.add_argument("files", nargs="+"); o.add_argument("--domain", default=None); o.add_argument("--scaffold", default=None); o.set_defaults(fn=cmd_onboard)
     v = sub.add_parser("verify", help="offline-verify an exported evidence bundle")
-    v.add_argument("bundle"); v.add_argument("--hs256-key", default=None); v.add_argument("--kid", default="k1")
+    v.add_argument("bundle"); v.add_argument("--dir", default=".", help="the product directory (default: here) — its anchor key verifies the bundle"); v.add_argument("--hs256-key", default=None); v.add_argument("--kid", default="k1")
     v.add_argument("--pubkey", default=None, help="the product's Ed25519 anchor public key (hex) — from .attenu/product.json anchor_pub")
     v.set_defaults(fn=cmd_verify)
     i = sub.add_parser("init", help="give this directory a product identity + a local anchor key (no cloud, no token)")
