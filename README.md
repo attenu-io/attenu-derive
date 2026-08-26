@@ -1,6 +1,6 @@
 # attenu-derive
 
-**Agent permissions, read from your app — not written, not described.**
+**Attenu Derive computes the permission set each AI agent task needs from the app itself — roster, tools, observed calls — for `attenu-guard` to enforce on every tool call and sub-agent handoff.**
 
 [attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (Attenu Guard, the library that enforces what this engine works out) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
 

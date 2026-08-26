@@ -5,7 +5,10 @@ All notable changes to attenu-derive are documented here. The format follows
 
 ## [Unreleased]
 
-- Packaging: `[project.urls]` (homepage, docs, source, changelog) so PyPI shows them.
+## [0.2.1] — 2026-08-26
+
+### Changed
+- Packaging: `[project.urls]` (homepage, docs, source, issues, changelog) so PyPI shows them; PyPI classifiers; the package summary and README opener now state what the engine does in one sentence. No code changes.
 
 ## [0.2.0] — 2026-08-25
 

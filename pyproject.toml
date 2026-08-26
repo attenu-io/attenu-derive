@@ -4,9 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "attenu-derive"
-version = "0.2.0"
-description = "Agent permissions, read from your app — not written, not described. Computes the permission set each agent task needs; attenu-guard enforces it."
+version = "0.2.1"
+description = "Attenu Derive: computes the permission set each AI agent task needs from the app itself — roster, tools, observed calls — for attenu-guard to enforce on every tool call and sub-agent handoff."
 keywords = ["ai", "agents", "security", "authorization", "least-privilege", "permissions", "delegation", "sub-agents", "audit-log", "owasp", "langgraph", "crewai", "google-adk", "openai-agents", "claude-agent-sdk"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: System Administrators",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+]
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -17,6 +29,7 @@ dependencies = ["attenu-guard>=0.4", "pyyaml>=6", "cryptography>=41"]     # the 
 Homepage = "https://attenu.io"
 Documentation = "https://attenu.io/docs/"
 Source = "https://github.com/attenu-io/attenu-derive"
+Issues = "https://github.com/attenu-io/attenu-derive/issues"
 Changelog = "https://attenu.io/changelog/"
 
 [project.scripts]

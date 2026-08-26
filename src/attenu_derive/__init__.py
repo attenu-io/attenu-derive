@@ -5,7 +5,7 @@ Public SDK:
     Deriver(domain=load_domain("retail-support"), operator_grants={"mail.send"}).propose(event)
 CLI: `attenu onboard <traces> --domain <pack>` / `attenu coverage` / `attenu verify <bundle> --hs256-key <hex>`.
 """
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from attenu_derive.derive.propose import Deriver, DelegationEvent, event_from_row, spec_to_authority
 from attenu_derive.catalog.coverage import load_catalog, load_domain, resolve, coverage
