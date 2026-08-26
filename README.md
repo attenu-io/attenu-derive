@@ -10,8 +10,8 @@
 each one has, what each task actually calls — and computes the permission set each task needs.
 [`attenu-guard`](https://github.com/attenu-io/attenu-guard) enforces that set inside your process,
 for every agent and every sub-agent handoff, and writes a tamper-evident audit log your auditor
-verifies offline. You approve the permission set once; payments, mail, deletes and code execution
-are never granted automatically — only by a named person.
+verifies offline. You approve the permissions once. Payments and deletes wait for a person you name, as do mail
+and code execution.
 
 You do not write a policy, and you do not describe one in prose. The input is the app itself.
 
