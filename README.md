@@ -2,7 +2,7 @@
 
 **Agent permissions, read from your app — not written, not described.**
 
-[attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (the enforcement library this engine feeds) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
+[attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (Attenu Guard, the library that enforces what this engine works out) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
 
 **Works with** LangGraph · LangChain / deepagents · OpenAI Agents SDK · Google ADK · Pydantic AI · CrewAI · AutoGen · Claude Agent SDK · smolagents · AWS Strands · LlamaIndex · Semantic Kernel · Agno — unmodified (table below).
 
@@ -13,7 +13,7 @@ for every agent and every sub-agent handoff, and writes a tamper-evident audit l
 verifies offline. You approve the permission set once; payments, mail, deletes and code execution
 are never granted automatically — only by a named person.
 
-Nobody writes a policy. Nobody describes one in prose. The input is the app itself.
+You do not write a policy, and you do not describe one in prose. The input is the app itself.
 
 ## How it works
 
@@ -26,12 +26,12 @@ Nobody writes a policy. Nobody describes one in prose. The input is the app itse
    service, finance, travel) · **L4** fail-closed default — an unknown tool is denied, not guessed.
    (An **L3** constrained-model proposal is designed and deliberately not shipped; see below.)
 3. **Meet.** The guard grants `parent.meet(proposal)`: a proposal can only ever *narrow* what the
-   parent holds, so an engine error over-restricts and never widens. A sub-agent can never hold
-   more than its parent.
+   parent holds, so an engine error over-restricts and never widens. An agent hands on no more than
+   it holds.
 4. **Approve.** `attenu onboard` prints the day-0 report — what resolves, what is held for a named
    person, what is unknown — and drafts a domain pack for the gaps. In our own onboarding runs
-   about 30% of tools needed a human decision, front-loaded on the sensitive ones; your operator's
-   number is the real one.
+   about 30% of tools needed a person to decide, front-loaded on the sensitive ones; the number from
+   your own run is the real one.
 5. **Enforce, prove.** Observe → shadow (derived permissions evaluated, nothing denied) → enforce.
    Rollback is one configuration change plus a restart. Every decision lands in the guard's
    hash-chained audit log; `attenu report` renders it, `attenu verify` checks an exported bundle
