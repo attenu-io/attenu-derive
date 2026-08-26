@@ -5,6 +5,8 @@ All notable changes to attenu-derive are documented here. The format follows
 
 ## [Unreleased]
 
+- Packaging: `[project.urls]` (homepage, docs, source, changelog) so PyPI shows them.
+
 ## [0.2.0] — 2026-08-25
 
 ### Changed — BREAKING
