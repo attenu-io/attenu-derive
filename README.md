@@ -2,7 +2,7 @@
 
 **Attenu Derive computes the permission set each AI agent task needs from the app itself — roster, tools, observed calls — for `attenu-guard` to enforce on every tool call and sub-agent handoff.**
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/attenu-io/attenu-derive/badge)](https://scorecard.dev/viewer/?uri=github.com/attenu-io/attenu-derive) [attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (Attenu Guard, the library that enforces what this engine works out) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
+[attenu.io](https://attenu.io) · [Docs](docs/) · [`attenu-guard`](https://github.com/attenu-io/attenu-guard) (Attenu Guard, the library that enforces what this engine works out) · [Threat model](docs/THREAT-MODEL.md) · [What is proven](docs/GATE-EVIDENCE.md)
 
 **Works with** LangGraph · LangChain / deepagents · OpenAI Agents SDK · Google ADK · Pydantic AI · CrewAI · AutoGen · Claude Agent SDK · smolagents · AWS Strands · LlamaIndex · Semantic Kernel · Agno · Haystack · CAMEL-AI · Microsoft Agent Framework · AG2 — unmodified (table below).
 
