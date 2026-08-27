@@ -5,6 +5,9 @@ All notable changes to attenu-derive are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Supply chain: SLSA build provenance (sigstore attestation) on every release; OpenSSF Scorecard weekly and on push.
+
 ## [0.2.1] — 2026-08-26
 
 ### Changed
