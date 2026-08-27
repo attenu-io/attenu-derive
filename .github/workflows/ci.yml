@@ -8,26 +8,15 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with: { python-version: "3.12" }
-      # attenu-guard is installed from its git repo until the PyPI release, over SSH with a read-only
-      # deploy key (secret DG_DEPLOY_KEY on this repo; public half on attenu-guard).
+      # attenu-guard comes from PyPI (0.5.0+); the pre-release SSH deploy-key path is gone.
       - name: Install
-        env: { DG_DEPLOY_KEY: "${{ secrets.DG_DEPLOY_KEY }}" }
         run: |
           python -m pip install -q --upgrade pip
           pip install -q pytest hypothesis
           # sampling-harness frameworks, so the budget-guard proofs (T1 deepagents, T9 ADK) RUN in CI instead of skipping
           pip install -q "google-adk>=2.7" "deepagents>=0.7" "langchain-anthropic>=1.0" "crewai>=1.15" litellm
-          if [ -n "$DG_DEPLOY_KEY" ]; then
-            mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            printf '%s\n' "$DG_DEPLOY_KEY" > ~/.ssh/dg_deploy_key && chmod 600 ~/.ssh/dg_deploy_key
-            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-            export GIT_SSH_COMMAND="ssh -i ~/.ssh/dg_deploy_key -o IdentitiesOnly=yes"
-            pip install -q "attenu-guard @ git+ssh://git@github.com/attenu-io/attenu-guard.git"
-            pip install -q -e .
-          else
-            echo "::warning::DG_DEPLOY_KEY not set — installing without attenu-guard"
-            pip install -q -e . --no-deps
-          fi
+          pip install -q -e .
+          python -c "import attenu_guard, attenu_derive; print('attenu-guard', attenu_guard.__version__)"
       - run: python -m pytest -q
       - name: G1 eval card (committed gold, express held out) — fails on regression vs eval/thresholds.json
         run: python -m attenu_derive.eval.g1 --holdout express --check --out reports
