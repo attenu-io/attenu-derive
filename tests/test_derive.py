@@ -2,6 +2,7 @@
 import time
 from attenu_guard import Authority, Guard, RowLimit, EgressRank
 from attenu_derive.derive.propose import Deriver, DelegationEvent
+from attenu_derive.derive.scope_grammar import delegate_scope
 
 PARENT = Authority({"fs.*", "agent.delegate.*", "agent.message", "web.fetch"}, [RowLimit(100_000), EgressRank("any")], ttl=3600)
 
@@ -308,3 +309,39 @@ def test_deriver_uses_domain_overlay_and_holds_requires_grant_without_operator_o
     a2, _ = d2.propose(_ev(task="Email care instructions", role="root", agent="customer_service_agent",
                            tools_available=cs_tools, declared_subagents=[], parent_authority=wide))
     assert a2.covers_scope("mail.send")
+
+
+# ---- delta review (post e459db8): agent.delegate.<name> has the identical D1 grammar problem, and it's the more
+# reachable half — unlike unknown.<tool>, a delegation target's name feeds the GRANTED authority directly, at
+# BOTH layers, via spec_to_authority. `Authority(scopes=["agent.delegate.TripPlanner"])` raises against the real
+# guard 0.10.0; these exercise the exact spec_to_authority path (propose()'s return) with a CamelCase name.
+
+def test_l1_delegating_writer_survives_a_camelcase_subagent_name():
+    """templates.py's delegating-writer branch (site of the fix): `agent.delegate.<name>` for each declared
+    sub-agent, built straight into the scope set `spec_to_authority` turns into the GRANTED Authority."""
+    d = Deriver()
+    ev = _ev(task="Produce a short architecture overview and save it to REPORT.md. Delegate the reading to TripPlanner.",
+             role="root", agent="orchestrator", tools_available=["ls", "glob", "grep", "read_file", "write_file", "task"],
+             declared_subagents=["TripPlanner"], parent_authority=PARENT)
+    auth, rec = d.propose(ev)                                     # must not raise
+    assert rec.template == "delegating-writer"
+    assert auth.covers_scope(delegate_scope("TripPlanner"))       # == "agent.delegate.trippplanner" -- normalised, not the raw CamelCase
+
+
+def test_l2_agent_delegate_tool_and_subtree_closure_survive_camelcase_names():
+    """propose.py's L2 `_l2()`: a tool that resolves to the literal `agent.delegate` family (e.g.
+    `transfer_to_agent`) fans out to every declared sub-agent's scope, AND the separate subtree-closure loop
+    (T13) adds `agent.delegate.<child>` for every declared sub-agent regardless of tools -- both build the
+    scope from the raw name. role="child" keeps L1 from matching, forcing L2."""
+    d = Deriver()
+    ev = _ev(task="hand off to the specialist", role="child", agent="router", tools_available=["transfer_to_agent"],
+             declared_subagents=["CamelCaseChild"], parent_authority=PARENT)
+    auth, rec = d.propose(ev)                                     # must not raise
+    assert rec.layer == "L2"
+    assert auth.covers_scope(delegate_scope("CamelCaseChild"))
+    # subtree closure alone (no agent.delegate tool at all) still reaches propose.py's `scopes.add(delegate_scope(child))`
+    ev2 = _ev(task="do nothing directly", role="child", agent="router2", tools_available=[],
+              declared_subagents=["AnotherCamelChild"], parent_authority=PARENT)
+    auth2, rec2 = d.propose(ev2)                                  # must not raise
+    assert rec2.layer == "L2"
+    assert auth2.covers_scope(delegate_scope("AnotherCamelChild"))

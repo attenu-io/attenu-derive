@@ -190,3 +190,24 @@ def test_delegation_requests_include_the_agents_own_descendants():
     assert not {s for s in delegations["flight_search_agent"].scopes if s.startswith("agent.delegate.")}   # a leaf delegates to nobody
     assert "agent.delegate.planning_agent" not in delegations["booking_agent"].scopes                      # only its OWN subtree
     assert set(delegations["planning_agent"].scopes) <= set(inst_full.scopes)                              # requests never exceed the installation
+
+
+def test_delegation_requests_survives_camelcase_agent_names():
+    """Delta review (post e459db8): the more reachable half of the D1 grammar problem. Unlike `unknown.<tool>`,
+    `agent.delegate.<name>` here is built straight from a declared ADK agent's `.name` into an `Authority`
+    constructed DIRECTLY (not filtered through tool_dispositions) -- so a CamelCase agent name (routine for
+    ADK/CrewAI agent classes) crashes the deriver's own installation/delegation authority, not just an eval.
+    `Authority(scopes=["agent.delegate.TripPlanner"])` raises against the real guard 0.10.0."""
+    from attenu_derive.catalog.coverage import load_domain
+    from attenu_derive.derive.scope_grammar import delegate_scope
+    from attenu_derive.sample.run_adk_enforce import delegation_requests, installation_authority
+    class A:
+        def __init__(self, name): self.name = name
+    root = A("RootPlanner"); mid = A("TripPlanner"); grandchild = A("HotelBot")   # a mid-tree CamelCase agent delegating to another
+    inst = installation_authority(load_domain("travel-planning"), set())
+    inst_full, delegations = delegation_requests(inst, [root, mid, grandchild], root,
+                                                  {"RootPlanner": {"TripPlanner": []}, "TripPlanner": {"HotelBot": []}})   # must not raise
+    assert delegate_scope("TripPlanner") in inst_full.scopes            # == "agent.delegate.trippplanner" -- normalised
+    assert delegate_scope("HotelBot") in inst_full.scopes
+    assert "agent.delegate.TripPlanner" not in inst_full.scopes         # the raw (invalid) form from before the fix
+    assert delegate_scope("HotelBot") in delegations[mid.name].scopes   # the mid-tree agent's OWN descendant (descendants()), also normalised

@@ -20,6 +20,7 @@ from attenu_guard import Authority, CallLimit, EgressRank, RowLimit
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
 from attenu_derive.derive import templates
+from attenu_derive.derive.scope_grammar import delegate_scope
 
 __all__ = ["DelegationEvent", "DerivationRecord", "Deriver", "spec_to_authority"]
 
@@ -114,7 +115,7 @@ class Deriver:
                 heuristic_used.append((t, e["scope"]))
             sc = e["scope"]
             if sc == "agent.delegate":
-                scopes |= {f"agent.delegate.{s}" for s in ev.declared_subagents}
+                scopes |= {delegate_scope(s) for s in ev.declared_subagents}
             elif sc == "state.write":
                 continue                                    # internal scratch, not a resource
             else:
@@ -126,7 +127,7 @@ class Deriver:
         # families of the subtree's declared tools, marked held_for_delegation — child ⊆ parent, never tier 2 via closure.
         held: set[str] = set()
         for child in (ev.declared_subagents or []):
-            scopes.add(f"agent.delegate.{child}")
+            scopes.add(delegate_scope(child))
         for child, ctools in (ev.subagent_tools or {}).items():
             for t in ctools or []:
                 ce = resolve(self.catalog, t, overlay=self.domain)

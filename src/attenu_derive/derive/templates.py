@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable
 
+from attenu_derive.derive.scope_grammar import delegate_scope
+
 # --- signals ---------------------------------------------------------------------------------
 _EXPLORE = re.compile(r"\b(explore|analy[sz]e|understand|find|identify|locate|inspect|read|grep|search|report (back|findings)|investigate|summari[sz]e how|list the)\b", re.I)
 _WRITE_OUT = re.compile(r"\b(save (it|the (result|report|findings)) to|write (it|a|the|findings|.*?)\s*(to\s+)?[A-Z0-9_\-]+\.md|write [A-Z0-9_\-]+\.md|produce .* (report|overview|summary)|save .*\.md)\b", re.I)
@@ -111,7 +113,7 @@ def match(role: str, task: str, tools_available: list[str], declared_subagents: 
         # the task happens to name is recorded as evidence only, never as the grant.
         low = re.sub(r"[-_]", " ", task.lower())
         named = [s for s in (declared_subagents or []) if re.search(r"\b" + re.escape(re.sub(r"[-_]", " ", s.lower())) + r"\b", low)]
-        scopes = set(write_scopes) | {f"agent.delegate.{s}" for s in (declared_subagents or [])}   # the write family ITS tool resolves to — none without a write tool
+        scopes = set(write_scopes) | {delegate_scope(s) for s in (declared_subagents or [])}   # the write family ITS tool resolves to — none without a write tool
         # Rubric v1.2 (T13, 2026-08-18): monotonic attenuation means child ⊆ parent — a parent cannot delegate what
         # it does not hold. The delegating-writer therefore HOLDS, for delegation, the read families its tools
         # resolve to (T12 semantics: never wider, tier<=1). Its OWN reads remain the over-exploration signal (R3),

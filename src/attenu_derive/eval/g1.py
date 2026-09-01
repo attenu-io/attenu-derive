@@ -34,8 +34,8 @@ from pathlib import Path
 from attenu_guard import Authority, EgressRank, RowLimit
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
-from attenu_derive.derive.disposition import unknown_tool_scope
 from attenu_derive.derive.propose import Deriver, DelegationEvent, FRAMEWORK_TOOLS, spec_to_authority, subagent_tools_for, tools_for
+from attenu_derive.derive.scope_grammar import delegate_scope, resolved_scope
 
 GOLD = Path(__file__).resolve().parents[1] / "corpus" / "gold" / "gold-v1.2.jsonl"
 THRESHOLDS = Path(__file__).with_name("thresholds.json")
@@ -88,21 +88,21 @@ def score(rows: list[dict], deriver: Deriver, cat: dict, parent: str = "chain") 
         for t in env["tools"]:
             if t in negatives:
                 continue                                    # not benign by the label
-            e = resolve(cat, t) or {}
-            sc = e["scope"] if "scope" in e else unknown_tool_scope(t)
+            resolved = resolve(cat, t)
+            sc = resolved_scope(resolved, t)
             if sc == "agent.delegate":
-                sc = f"agent.delegate.{(g.get('delegated_to') or ['researcher'])[0]}"
+                sc = delegate_scope((g.get('delegated_to') or ['researcher'])[0])
             if sc == "state.write":
                 continue
             benign_total += 1
-            ctx = _ctx_for(t, e, env.get("quantities_max") or {})
+            ctx = _ctx_for(t, resolved or {}, env.get("quantities_max") or {})
             d = granted.permits(sc, ctx)
             if not d:
                 cause = "parent-chain" if proposal.permits(sc, ctx) else "proposal"
                 benign_denied += 1; denied_here.append((t, sc, d.reasons[0].code if d.reasons else "?", cause))
             used_scopes.add(sc)
         for child in (g.get("delegated_to") or []):            # a spawn IS a use of agent.delegate.<child> (deepagents records it as spawn, not a call)
-            used_scopes.add(f"agent.delegate.{child}")
+            used_scopes.add(delegate_scope(child))
         used_by_node[key] = used_scopes
         scored.append((idx, g, key, granted, rec, used_scopes, denied_here))
     # transitive use: a descendant's use counts as the ancestor's use (a scope held to pass down and actually passed down)

@@ -28,6 +28,7 @@ from attenu_guard import Authority, Guard, RowLimit, EgressRank, identity
 
 from attenu_derive.catalog.coverage import load_catalog, load_domain
 from attenu_derive.derive.disposition import tool_dispositions
+from attenu_derive.derive.scope_grammar import delegate_scope
 from attenu_derive.evidence_out import effective_grants, product_meta as _product_meta, write_evidence  # noqa: F401 (re-exported)
 from attenu_derive.sample.run_adk_app import declared_suites, load_root_agent, override_models, walk_agents
 
@@ -42,7 +43,7 @@ def installation_authority(domain: dict, operator_grants: set[str]) -> Authority
         if e.get("requires_grant") and sc not in operator_grants:
             continue                                    # held pending an operator grant: NOT in the installation authority
         scopes.add(sc)
-    scopes |= {f"agent.delegate.{a.name}" for a in []}   # (single-agent apps have no sub-agents; multi-agent adds them below)
+    scopes |= {delegate_scope(a.name) for a in []}   # (single-agent apps have no sub-agents; multi-agent adds them below)
     return Authority(scopes, [RowLimit(1_000_000), EgressRank("any")], ttl=None)
 
 
@@ -85,12 +86,12 @@ def delegation_requests(inst: Authority, agents, root_agent, subs_by_agent: dict
                 seen.add(c); descendants(c, seen)
         return seen
 
-    inst_full = Authority(set(inst.scopes) | {f"agent.delegate.{n}" for n in names}, inst.ceilings, ttl=None)
+    inst_full = Authority(set(inst.scopes) | {delegate_scope(n) for n in names}, inst.ceilings, ttl=None)
     delegations = {}
     for a in agents:
         if a is root_agent:
             continue
-        delegations[a.name] = Authority(set(inst.scopes) | {f"agent.delegate.{d}" for d in descendants(a.name)}, inst.ceilings, ttl=None)
+        delegations[a.name] = Authority(set(inst.scopes) | {delegate_scope(d) for d in descendants(a.name)}, inst.ceilings, ttl=None)
     return inst_full, delegations
 
 

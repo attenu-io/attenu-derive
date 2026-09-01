@@ -27,18 +27,17 @@ from dataclasses import replace
 from pathlib import Path
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
-from attenu_derive.derive.disposition import unknown_tool_scope
 from attenu_derive.derive.propose import Deriver, event_from_row, spec_to_authority
+from attenu_derive.derive.scope_grammar import delegate_scope, resolved_scope
 from attenu_derive.eval.g1 import OBSERVE_PARENT, _ctx_for
 
 __all__ = ["shadow", "shadow_files"]
 
 
 def _scope_of(cat: dict, tool: str, row: dict) -> str:
-    e = resolve(cat, tool) or {}
-    sc = str(e.get("scope") or unknown_tool_scope(tool))
+    sc = resolved_scope(resolve(cat, tool), tool)
     if sc == "agent.delegate":
-        sc = f"agent.delegate.{(row.get('delegated_to') or ['researcher'])[0]}"
+        sc = delegate_scope((row.get('delegated_to') or ['researcher'])[0])
     return sc
 
 
