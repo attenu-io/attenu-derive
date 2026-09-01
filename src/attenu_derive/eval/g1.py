@@ -34,6 +34,7 @@ from pathlib import Path
 from attenu_guard import Authority, EgressRank, RowLimit
 
 from attenu_derive.catalog.coverage import load_catalog, resolve
+from attenu_derive.derive.disposition import unknown_tool_scope
 from attenu_derive.derive.propose import Deriver, DelegationEvent, FRAMEWORK_TOOLS, spec_to_authority, subagent_tools_for, tools_for
 
 GOLD = Path(__file__).resolve().parents[1] / "corpus" / "gold" / "gold-v1.2.jsonl"
@@ -88,7 +89,7 @@ def score(rows: list[dict], deriver: Deriver, cat: dict, parent: str = "chain") 
             if t in negatives:
                 continue                                    # not benign by the label
             e = resolve(cat, t) or {}
-            sc = e.get("scope", f"unknown.{t}")
+            sc = e["scope"] if "scope" in e else unknown_tool_scope(t)
             if sc == "agent.delegate":
                 sc = f"agent.delegate.{(g.get('delegated_to') or ['researcher'])[0]}"
             if sc == "state.write":

@@ -10,6 +10,7 @@ from __future__ import annotations
 import glob, json, os, re, sys
 from pathlib import Path
 from attenu_derive.catalog.coverage import load_catalog, resolve
+from attenu_derive.derive.disposition import unknown_tool_scope
 
 QUP = {"0": 0, "1": 1, "2-10": 10, "11-100": 100, "101-1k": 1000, "1k-10k": 10_000, "10k-100k": 100_000, "100k-1M": 1_000_000, "1M+": None}
 _RV = os.environ.get("RUBRIC_VERSION", "1.2")
@@ -22,7 +23,8 @@ _DELEGATE_ALL_READING = re.compile(r"(use the researcher (sub-?agent )?for all r
 def label_row(r: dict, cat: dict) -> dict:
     env = r["observed_envelope"]; scopes = set()
     for t in env["tools"]:
-        sc = (resolve(cat, t) or {}).get("scope", f"unknown.{t}")
+        e = resolve(cat, t) or {}
+        sc = e["scope"] if "scope" in e else unknown_tool_scope(t)
         if sc != "agent.delegate":
             scopes.add(sc)
     for child in r.get("delegated_to", []):

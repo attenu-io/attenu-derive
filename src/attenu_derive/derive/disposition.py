@@ -11,18 +11,49 @@ invented here. The derivation mechanism itself stays where it is — this only n
 """
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 from attenu_guard import Disposition
 
 from attenu_derive.catalog.coverage import resolve
 
-__all__ = ["tool_dispositions"]
+__all__ = ["tool_dispositions", "unknown_tool_scope"]
+
+# D1 (attenu-guard 0.8.0) tightened the scope grammar to lowercase dot-separated segments
+# (^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)*\.([a-z0-9_-]+|\*)$), enforced at `Authority` construction.
+# A raw tool name is not guaranteed to match a single segment of that grammar (CamelCase tool classes
+# are routine in LangChain/MCP), so it must be normalised before it can appear in `unknown.<segment>`.
+_SCOPE_SEGMENT_INVALID = re.compile(r"[^a-z0-9_-]+")
+
+
+def _scope_segment(name: str) -> str:
+    """Normalise an arbitrary tool name into a single segment valid under the shim's scope grammar
+    (`^[a-z][a-z0-9_-]*$`): lowercase; any run of characters outside `[a-z0-9_-]` collapses to one
+    `_`; leading/trailing `_`/`-` are stripped. A degenerate result (empty, or not starting with a
+    letter — e.g. an all-separator or digit-leading name) gets a `t`/`t_` prefix so the segment still
+    starts with a letter, which the grammar requires."""
+    s = _SCOPE_SEGMENT_INVALID.sub("_", (name or "").lower()).strip("_-")
+    if not s:
+        return "t"
+    if not s[0].isalpha():
+        return f"t_{s}"
+    return s
+
+
+def unknown_tool_scope(name: str) -> str:
+    """The `unknown.<segment>` scope for a tool with no catalog/pack entry — the one place every caller
+    (dispositions, gold labelling, G1/shadow scoring) goes through, so an unresolved tool's fallback
+    scope is always grammar-valid (D1) AND identical across the derivation and evaluation pipelines —
+    two independently-built `unknown.<tool>` strings for the same raw name must compare equal wherever
+    scopes are set-compared (e.g. G1's gold-vs-granted `_covers`)."""
+    return f"unknown.{_scope_segment(name)}"
 
 
 def tool_dispositions(catalog: dict, domain: dict | None, tools: Iterable[str], operator_grants: set[str], *,
                       held: set[str] | frozenset[str] = frozenset(), heuristics: bool = False) -> dict[str, tuple[str, str | None]]:
-    """{tool: (scope, disposition_or_None)}. `scope` is the resolved scope or `unknown.<tool>` when unresolved.
+    """{tool: (scope, disposition_or_None)}. `scope` is the resolved scope or `unknown.<segment>` (the tool name
+    normalised into a grammar-valid segment, see `unknown_tool_scope`) when unresolved.
     `heuristics=False` = the enforce posture (curated only); `heuristics=True` = the day-0/shadow posture."""
     from attenu_derive.catalog.heuristics import HEURISTIC_MAX_GRANT_TIER
     out: dict[str, tuple[str, str | None]] = {}
@@ -30,7 +61,7 @@ def tool_dispositions(catalog: dict, domain: dict | None, tools: Iterable[str], 
     for t in tools:
         e = resolve(catalog, t, heuristics=heuristics, overlay=domain)
         if e is None or str(e.get("scope", "")).startswith("unknown."):
-            out[t] = (f"unknown.{t}", Disposition.UNRESOLVED)
+            out[t] = (unknown_tool_scope(t), Disposition.UNRESOLVED)
             continue
         sc = str(e["scope"])
         if e.get("heuristic") and int(e.get("tier", 2)) > HEURISTIC_MAX_GRANT_TIER:
