@@ -71,6 +71,7 @@ def resolved_scope(entry: dict | None, tool: str) -> str:
     derivation/evaluation call site that needs "the scope, or unknown.<tool> if this doesn't really
     resolve" goes through this one function so they agree deliberately, not by the coincidence of two
     independently-written fallbacks happening to produce the same string for today's catalog."""
-    if entry is None or str(entry.get("scope", "")).startswith("unknown."):
+    sc = str((entry or {}).get("scope") or "")
+    if entry is None or not sc or sc.startswith("unknown."):
         return unknown_tool_scope(tool)
-    return str(entry["scope"])
+    return sc
