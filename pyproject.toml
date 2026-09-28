@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "attenu-derive"
-version = "0.2.1"
+version = "0.2.2"
 description = "Attenu Derive: computes the permission set each AI agent task needs from the app itself — roster, tools, observed calls — for attenu-guard to enforce on every tool call and sub-agent handoff."
 keywords = ["ai", "agents", "security", "authorization", "least-privilege", "permissions", "delegation", "sub-agents", "audit-log", "owasp", "langgraph", "crewai", "google-adk", "openai-agents", "claude-agent-sdk"]
 classifiers = [
