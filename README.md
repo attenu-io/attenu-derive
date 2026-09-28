@@ -43,8 +43,10 @@ model into *asking*; it cannot widen what the process is allowed to do.
 ## Supported frameworks
 
 The engine feeds [`attenu-guard`](https://github.com/attenu-io/attenu-guard), whose adapters attach at each
-framework's official extension points — the framework stays **unmodified**. Observe-mode recorders exist for
-the same set.
+framework's official extension points — the framework stays **unmodified**. The guard ships 20 adapter
+modules; the table below lists 12 of them. The engine has observe-mode
+recorders for 4 of them (Google ADK, CrewAI, deepagents, Claude Agent SDK) under `src/attenu_derive/sample/`,
+plus live-enforce runners for Google ADK, CrewAI and LangGraph (deepagents).
 
 | Framework | Adapter | Offline demo + tests | Enforced live on a real app |
 |---|---|---|---|
@@ -62,8 +64,9 @@ the same set.
 | Agno | `.agno` | ✓ | — |
 
 Pinned versions run in CI; a weekly job tests the unpinned latest of every framework, so upstream breakage
-is caught on our side first. MCP and A2A: the guard's wire format carries the chain across services;
-server-side verification examples are on the roadmap.
+is caught on our side first. MCP and A2A: the guard's wire format carries the chain across services, and the guard repo
+ships server-side verification for both: `examples/integrations/mcp/server_verifier/` and
+`src/attenu_guard/adapters/a2a.py` with `examples/integrations/a2a/`.
 
 ## Quick start
 
@@ -107,7 +110,8 @@ In local mode, nothing leaves your environment: no telemetry, no outbound calls;
 a redacted bundle your operator exports by hand. The local audit log holds names, scope classes,
 quantity buckets and salted hashes — an export fails rather than ship a field it does not
 recognise. Custody is yours: the anchor key is product-local by default; KMS/HSM custody is
-validated against a real key (`docs/OPS-RUNBOOK.md`).
+validated against a real AWS KMS key (`tools/kms_live_validation.py`; custody options in
+`docs/GATE-EVIDENCE.md`).
 
 ## What is different
 
