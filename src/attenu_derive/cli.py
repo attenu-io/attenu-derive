@@ -17,6 +17,7 @@ import argparse
 import os
 import glob
 import json
+import shlex
 import sys
 from collections import Counter
 from pathlib import Path
@@ -115,9 +116,22 @@ def cmd_verify(args) -> int:
     return 0 if rep["ok"] else 1
 
 
+def _default_product_name(product_dir: Path) -> str | None:
+    """`attenu init` without --product: keep the name an existing product already has, else name it after its directory."""
+    from attenu_derive import product
+    if (product_dir / ".attenu" / "product.json").exists():
+        name = (product.load_product_json(product_dir) or {}).get("name")
+        if name:
+            return name
+    return product_dir.resolve().name or None
+
+
 def cmd_init(args) -> int:
     from attenu_derive import product
-    meta = product.init_product(Path(args.dir), args.product, args.env, anchor=args.anchor, kms_key_id=args.kms_key_id, kms_region=args.kms_region)
+    name = args.product or _default_product_name(Path(args.dir))
+    if not name:
+        print("attenu init: cannot name the product after this directory; run: attenu init --product NAME", file=sys.stderr); return 2
+    meta = product.init_product(Path(args.dir), name, args.env, anchor=args.anchor, kms_key_id=args.kms_key_id, kms_region=args.kms_region)
     print(json.dumps({"product_dir": str(Path(args.dir).resolve()),
                       **{k: meta.get(k) for k in ("product_id", "name", "environment", "anchor_kind", "anchor_kid")}}, indent=2))
     return 0
@@ -133,11 +147,24 @@ def cmd_products(args) -> int:
     return 0
 
 
+def _dir_flag(d: str) -> str:
+    return "" if Path(d) == Path(".") else f" --dir {shlex.quote(d)}"
+
+
 def cmd_demo(args) -> int:
+    from attenu_derive.product import has_product
+    if not has_product(Path(args.dir)):                  # checked before the demo writes anything
+        print(f"attenu demo: no product here; run `attenu init{_dir_flag(args.dir)}` first", file=sys.stderr); return 2
     from attenu_derive.sample.demo_local import run_demo
     rep = run_demo(Path(args.dir), slow=args.slow, scenario=args.scenario)
     print(json.dumps({k: rep[k] for k in ("scenario", "chain_id", "agents", "tools", "ledger_path", "bundle_path", "anchor_kid", "grants",
                                            "narrower_than_root", "denials_view")}, indent=2))
+    sys.stdout.flush()
+    # the human lines go last (stderr, so `attenu demo | jq` still gets clean JSON): what to run next, with the real paths
+    print("\nnext:\n"
+          f"  attenu-guard view {shlex.quote(str(rep['ledger_path']))}\n"
+          f"  attenu verify {shlex.quote(str(rep['bundle_path']))}{_dir_flag(args.dir)}\n"
+          f"  attenu report{_dir_flag(args.dir)}", file=sys.stderr)
     return 0
 
 
@@ -145,7 +172,8 @@ def cmd_ui(args) -> int:
     try:
         from attenu_console.cli import serve_main
     except ImportError:
-        print("attenu ui needs the console package (attenu-console — see https://attenu.io)", file=sys.stderr); return 2
+        print("attenu ui: the local console is not published yet. `attenu report` produces the HTML evidence report today.",
+              file=sys.stderr); return 2
     return serve_main(["--dir", args.dir, "--port", str(args.port)] + (["--open"] if args.open else []))
 
 
@@ -237,7 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--pubkey", default=None, help="the product's Ed25519 anchor public key (hex) — from .attenu/product.json anchor_pub")
     v.set_defaults(fn=cmd_verify)
     i = sub.add_parser("init", help="give this directory a product identity + a local anchor key (no cloud, no token)")
-    i.add_argument("--product", required=True); i.add_argument("--env", default="dev"); i.add_argument("--dir", default=".")
+    i.add_argument("--product", default=None, help="product name (default: the existing product's name, else the directory's name)"); i.add_argument("--env", default="dev"); i.add_argument("--dir", default=".")
     i.add_argument("--anchor", choices=["local", "kms"], default="local", help="anchor key custody: local Ed25519 key file (default) or a cloud KMS key (never leaves the HSM)")
     i.add_argument("--kms-key-id", default=None); i.add_argument("--kms-region", default=None)
     i.set_defaults(fn=cmd_init)
@@ -264,7 +292,7 @@ def build_parser() -> argparse.ArgumentParser:
     sy = sub.add_parser("sync", help="drain the spool + anchors to the cloud, heartbeat, pull grants (a separate process — never in the deny path)")
     sy.add_argument("--dir", default="."); sy.add_argument("--watch", action="store_true"); sy.add_argument("--every", type=float, default=10.0)
     sy.set_defaults(fn=cmd_sync)
-    u = sub.add_parser("ui", help="open the local console over this machine's products (needs attenu-console)")
+    u = sub.add_parser("ui", help="the local console: not published yet; `attenu report` produces the HTML evidence report today")
     u.add_argument("--dir", default="."); u.add_argument("--port", type=int, default=8787); u.add_argument("--open", action="store_true")
     u.set_defaults(fn=cmd_ui)
     return ap

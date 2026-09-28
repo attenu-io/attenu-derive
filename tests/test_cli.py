@@ -1,6 +1,9 @@
 """A1: the `attenu` CLI (packaged path) — public SDK surface + coverage / onboard / verify through the console entry."""
 import json
 import os
+from pathlib import Path
+
+import pytest
 
 from attenu_derive import Deriver, DelegationEvent, load_domain, __version__
 from attenu_derive.cli import build_parser, main, scaffold_pack
@@ -67,7 +70,7 @@ def test_cli_verify_with_a_public_key(tmp_path, monkeypatch, capsys):
     assert main(["verify", str(tmp_path / "b2.json"), "--pubkey", meta["anchor_pub"], "--kid", meta["anchor_kid"]]) == 1
 
 
-def test_cli_ui_without_console_installed_says_how_to_get_it(monkeypatch, capsys):
+def test_cli_ui_without_console_installed_says_what_works_today(monkeypatch, capsys):
     import builtins
     from attenu_derive.cli import main
     real = builtins.__import__
@@ -76,7 +79,9 @@ def test_cli_ui_without_console_installed_says_how_to_get_it(monkeypatch, capsys
             raise ImportError("nope")
         return real(name, *a, **k)
     monkeypatch.setattr(builtins, "__import__", fake)
-    assert main(["ui"]) == 2 and "attenu-console" in capsys.readouterr().err
+    err = capsys.readouterr().err if main(["ui"]) == 2 else pytest.fail("attenu ui should exit 2 without the console")
+    assert "not published yet" in err and "attenu report" in err
+    assert "attenu-console" not in err and "https://" not in err     # no pointer to a package that is not on PyPI
 
 
 def test_cli_demo_writes_a_chain_into_the_product(tmp_path, monkeypatch, capsys):
@@ -124,3 +129,64 @@ def test_cli_verify_defaults_to_the_products_anchor_key(tmp_path, monkeypatch, c
     assert bundles, "the demo should have exported a bundle"
     assert main(["verify", str(bundles[-1]), "--dir", str(d)]) == 0
     assert '"ok": true' in capsys.readouterr().out
+
+
+def test_cli_init_without_product_names_it_after_the_directory(tmp_path, monkeypatch, capsys):
+    """The README's first command: `attenu init` with no flags works and names the product after its directory."""
+    import json
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    d = tmp_path / "my-app"; d.mkdir()
+    assert main(["init", "--dir", str(d)]) == 0
+    assert json.loads(capsys.readouterr().out)["name"] == "my-app"
+    assert json.loads((d / ".attenu" / "product.json").read_text())["name"] == "my-app"
+
+
+def test_cli_init_without_product_keeps_an_existing_name(tmp_path, monkeypatch, capsys):
+    import json
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    d = tmp_path / "proj"
+    assert main(["init", "--product", "Mortgage Assistant", "--dir", str(d)]) == 0
+    pid = json.loads(capsys.readouterr().out)["product_id"]
+    assert main(["init", "--dir", str(d)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["name"] == "Mortgage Assistant" and out["product_id"] == pid
+
+
+def test_cli_demo_without_a_product_says_run_init_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    d = tmp_path / "proj"; d.mkdir()
+    assert main(["demo", "--scenario", "fanout", "--dir", str(d)]) == 2
+    out = capsys.readouterr()
+    assert out.out == "" and "attenu init" in out.err and len(out.err.strip().splitlines()) == 1
+    assert "Traceback" not in out.err
+    assert not (d / ".attenu").exists(), "nothing may be written before the product check"
+
+
+def test_run_demo_without_a_product_refuses_before_writing(tmp_path):
+    from attenu_derive.sample.demo_local import run_demo
+    d = tmp_path / "proj"; d.mkdir()
+    with pytest.raises(FileNotFoundError, match="attenu init"):
+        run_demo(d)
+    assert not (d / ".attenu").exists()
+
+
+def test_cli_demo_ends_with_the_next_commands_and_real_paths(tmp_path, monkeypatch, capsys):
+    """The last lines the reader sees are the three next commands, with the paths the demo just wrote; they run."""
+    import json
+    import shlex
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    d = tmp_path / "proj"
+    assert main(["init", "--dir", str(d)]) == 0
+    capsys.readouterr()
+    assert main(["demo", "--scenario", "fanout", "--dir", str(d)]) == 0
+    out = capsys.readouterr()
+    rep = json.loads(out.out)                                         # stdout stays pure JSON for anything piping it
+    tail = [l.strip() for l in out.err.strip().splitlines()]
+    assert tail[0] == "next:" and len(tail) == 4
+    view, verify, report = (shlex.split(l) for l in tail[1:])
+    assert view == ["attenu-guard", "view", rep["ledger_path"]]
+    assert verify == ["attenu", "verify", rep["bundle_path"], "--dir", str(d)]
+    assert report == ["attenu", "report", "--dir", str(d)]
+    assert Path(rep["ledger_path"]).is_file() and Path(rep["bundle_path"]).is_file()
+    assert main(verify[1:]) == 0 and '"ok": true' in capsys.readouterr().out
+    assert main(report[1:]) == 0 and "index.html" in capsys.readouterr().out

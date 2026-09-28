@@ -4,7 +4,7 @@ can be demonstrated anywhere:
 
     attenu init --product "Travel Demo" --dir .
     attenu demo [--scenario basic|fanout] [--slow 1]
-    attenu ui
+    attenu report        # the HTML evidence report (the local console is not published yet)
 
 `basic`  — the A3 travel-booking story: a planner delegates to a booking agent; reads pass, the payment is HELD
            pending an operator grant, an unknown tool is UNRESOLVED.
@@ -76,6 +76,9 @@ def run_demo(product_dir: Path, *, slow: float = 0.0, grants: set[str] | None = 
     if scenario not in ("basic", "fanout"):
         raise ValueError(f"unknown scenario {scenario!r}; choose basic | fanout")
     product_dir = Path(product_dir)
+    from attenu_derive.product import has_product
+    if not has_product(product_dir):                     # refuse before writing anything: no orphan ledger under a missing product
+        raise FileNotFoundError(f"no product in {product_dir}; run `attenu init` there first")
     grants = set(grants) if grants is not None else load_grants(product_dir)
     heur = get_policy(product_dir)["unknown_tools"] == "heuristic"           # product policy for what the catalog cannot resolve
     note_run(product_dir, identity.boot_id(), framework="demo (scripted)", mode="enforce")

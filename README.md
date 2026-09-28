@@ -69,7 +69,7 @@ server-side verification examples are on the roadmap.
 
 ```bash
 pip install attenu-derive            # pulls attenu-guard; zero network needed to enforce
-attenu init                          # product identity + a local Ed25519 anchor key (no cloud)
+attenu init --product my-app         # product identity + a local Ed25519 anchor key (no cloud); --product defaults to the directory name
 attenu demo --scenario fanout        # 9 agents, 18 tools, every disposition, a real anchored ledger — USD 0
 attenu coverage  <observed-log>      # what the catalog resolves for these tool calls
 attenu onboard   <observed-log>      # day-0 report + a draft domain pack for the gaps
@@ -79,8 +79,9 @@ attenu verify    <bundle.json>       # offline verification of an exported evide
 
 `attenu policy` / `config` / `grant` / `ceiling` manage the product's signed configuration
 revisions: operator grants, declared tools, the ceiling of scopes this product may *ever* be
-granted. `attenu link` / `sync` / `ui` connect to the optional [Attenu console](https://attenu.io);
-the console is never in the deny path and nothing here needs it.
+granted. `attenu link` / `sync` connect to the optional [Attenu console](https://attenu.io);
+the console is never in the deny path and nothing here needs it. `attenu ui`: the local console is
+not published yet; `attenu report` produces the HTML evidence report today.
 
 ## What is measured — and what is not
 

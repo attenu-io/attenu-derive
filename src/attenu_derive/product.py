@@ -17,7 +17,7 @@ from pathlib import Path
 
 from attenu_guard.wire import ECDSAP256Verifier, Ed25519Signer, Ed25519Verifier
 
-__all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "load_product_json",
+__all__ = ["home_dir", "registry_path", "registry_list", "registry_add", "init_product", "has_product", "load_product_json",
            "load_anchor_signer", "load_anchor_verifier", "grants_path", "load_grants", "add_grant", "remove_grant", "grant_key", "note_run", "run_meta",
            "pack_path", "load_pack", "declare_tool", "effective_domain", "get_policy", "set_policy", "POLICY_DEFAULTS", "POLICY_CHOICES"]
 
@@ -91,6 +91,11 @@ def init_product(product_dir: Path, name: str, environment: str = "dev", *, anch
     if existing is None or not (att / "config" / "HEAD").exists():
         _cfg.ensure_initialized(product_dir)                       # revision 0, signed by the product key
     return meta
+
+
+def has_product(product_dir: Path) -> bool:
+    """True once `attenu init` has given `product_dir` a product identity."""
+    return (Path(product_dir) / ".attenu" / "product.json").is_file()
 
 
 def load_product_json(product_dir: Path) -> dict:
