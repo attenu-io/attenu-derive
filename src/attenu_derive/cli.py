@@ -181,7 +181,7 @@ def cmd_link(args) -> int:
     try:
         from attenu_cloud.client import link
     except ImportError:
-        print("attenu link needs the Attenu cloud client: the attenu-console package (optional; ships with the Attenu console — see https://attenu.io; nothing else needs it)", file=sys.stderr); return 2
+        print("attenu link: the control plane is not published yet.", file=sys.stderr); return 2
     out = link(Path(args.dir), args.token, base_url=args.url, environment=args.env)
     print(json.dumps({k: out[k] for k in ("product_id", "environment", "base_url")}, indent=2)); return 0
 
@@ -191,7 +191,7 @@ def cmd_sync(args) -> int:
     try:
         from attenu_cloud.client import sync
     except ImportError:
-        print("attenu sync needs the Attenu cloud client: the attenu-console package (optional; ships with the Attenu console — see https://attenu.io; nothing else needs it)", file=sys.stderr); return 2
+        print("attenu sync: the control plane is not published yet.", file=sys.stderr); return 2
     while True:
         rep = sync(Path(args.dir)); print(json.dumps(rep))
         if not args.watch:
@@ -286,10 +286,10 @@ def build_parser() -> argparse.ArgumentParser:
     ce.add_argument("--dir", default="."); ce.add_argument("--set", nargs="*", default=None, metavar="SCOPE"); ce.set_defaults(fn=cmd_ceiling)
     rp = sub.add_parser("report", help="write printable evidence reports (HTML) for this product's chains + a product summary (print -> PDF)")
     rp.add_argument("--dir", default="."); rp.add_argument("--chain", default=None); rp.set_defaults(fn=cmd_report)
-    lk = sub.add_parser("link", help="connect this product to the Attenu cloud with a self-serve token (writes .attenu/token, cloud.json, telemetry=on)")
+    lk = sub.add_parser("link", help="connect this product to the hosted control plane: not published yet")
     lk.add_argument("--token", required=True); lk.add_argument("--dir", default="."); lk.add_argument("--env", default=None)
     lk.add_argument("--url", default=os.environ.get("ATTENU_CLOUD_URL", "https://console.attenu.io")); lk.set_defaults(fn=cmd_link)
-    sy = sub.add_parser("sync", help="drain the spool + anchors to the cloud, heartbeat, pull grants (a separate process — never in the deny path)")
+    sy = sub.add_parser("sync", help="sync this product with the hosted control plane: not published yet")
     sy.add_argument("--dir", default="."); sy.add_argument("--watch", action="store_true"); sy.add_argument("--every", type=float, default=10.0)
     sy.set_defaults(fn=cmd_sync)
     u = sub.add_parser("ui", help="the local console: not published yet; `attenu report` produces the HTML evidence report today")

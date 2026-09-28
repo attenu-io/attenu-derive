@@ -103,8 +103,8 @@ def test_cli_sync_on_an_unlinked_product_says_so(tmp_path, monkeypatch, capsys):
     try:
         import attenu_cloud  # noqa: F401 — the optional client: with it, sync reports "not linked"
         assert rc == 1 and "not linked" in out.out
-    except ImportError:                                   # without it, the open engine says what to install
-        assert rc == 2 and "cloud client" in out.err
+    except ImportError:                                   # without it, the open engine says the truth
+        assert rc == 2 and "not published yet" in out.err
 
 
 def test_cli_policy_show_and_set(tmp_path, monkeypatch, capsys):
@@ -190,3 +190,28 @@ def test_cli_demo_ends_with_the_next_commands_and_real_paths(tmp_path, monkeypat
     assert Path(rep["ledger_path"]).is_file() and Path(rep["bundle_path"]).is_file()
     assert main(verify[1:]) == 0 and '"ok": true' in capsys.readouterr().out
     assert main(report[1:]) == 0 and "index.html" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv", [["ui"], ["link", "--token", "t"], ["sync"]])
+def test_console_commands_without_the_console_say_not_published_and_name_no_package(argv, tmp_path, monkeypatch, capsys):
+    """ui / link / sync without the unpublished console packages: exit 2, one truthful line, no package name, no URL."""
+    import builtins
+    monkeypatch.setenv("ATTENU_HOME", str(tmp_path / "home"))
+    real = builtins.__import__
+    def fake(name, *a, **k):
+        if name.startswith(("attenu_console", "attenu_cloud")):
+            raise ImportError("nope")
+        return real(name, *a, **k)
+    monkeypatch.setattr(builtins, "__import__", fake)
+    assert main(argv + ["--dir", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert "not published yet" in err and len(err.strip().splitlines()) == 1
+    assert "attenu-console" not in err and "http" not in err and "attenu.io" not in err
+
+
+@pytest.mark.parametrize("cmd", ["ui", "link", "sync"])
+def test_console_commands_help_names_no_package_or_url(cmd):
+    sub = next(a for a in build_parser()._actions if a.dest == "cmd")
+    help_text = next(c.help for c in sub._choices_actions if c.dest == cmd)
+    assert "not published yet" in help_text
+    assert "attenu-console" not in help_text and "http" not in help_text

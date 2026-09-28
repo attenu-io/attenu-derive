@@ -79,9 +79,9 @@ attenu verify    <bundle.json>       # offline verification of an exported evide
 
 `attenu policy` / `config` / `grant` / `ceiling` manage the product's signed configuration
 revisions: operator grants, declared tools, the ceiling of scopes this product may *ever* be
-granted. `attenu link` / `sync` connect to the optional [Attenu console](https://attenu.io);
-the console is never in the deny path and nothing here needs it. `attenu ui`: the local console is
-not published yet; `attenu report` produces the HTML evidence report today.
+granted. `attenu link` / `sync` / `ui` talk to the Attenu console, and the hosted console is not
+public yet. Nothing here needs it, and it is never in the deny path. `attenu report` produces the
+HTML evidence report today.
 
 ## What is measured — and what is not
 

@@ -13,6 +13,7 @@ All notable changes to attenu-derive are documented here. The format follows
 - `attenu demo` in a directory without a product exits 2 with one line saying to run `attenu init`, and writes nothing (it used to crash with a traceback and leave a partial ledger).
 - `attenu demo` ends with the three next commands and the real paths it wrote: `attenu-guard view`, `attenu verify`, `attenu report`. The JSON stays on stdout; the next block goes to stderr.
 - `attenu ui` says the truth: the local console is not published yet, and `attenu report` produces the HTML evidence report today.
+- `attenu link` and `attenu sync` without the cloud client say the control plane is not published yet, instead of pointing at a package that is not on PyPI.
 
 ## [0.2.1] — 2026-08-26
 
