@@ -110,7 +110,8 @@ unused-scope 5.8% · over-provision 3 · escalation 0** (thresholds ≤2% / ≤2
   signer the engine trusts offline; `attenu config` / `attenu ceiling`; the console shows "what I decided and what
   changed" with diffs and signatures. **Custody options:** product-local Ed25519 key (default) or **KMS** (`attenu init
   --anchor kms`; ES256; the key never leaves the HSM; auditors verify with `ECDSAP256Verifier`, no cloud SDK) —
-  stub-tested until an AWS account exists. **Out-of-band anchoring** (`AnchorScheduler`) for long-running apps.
+  validated 2026-08-19 against a real AWS KMS ECC_NIST_P256 key, PASSED (`tools/kms_live_validation.py`; the key
+  was scheduled for deletion after the run). **Out-of-band anchoring** (`AnchorScheduler`) for long-running apps.
   **Evidence report** (`attenu report`, the console's Report button): a printable page rendered from the bundle +
   verification — the three checks, the anchor key, the chain as tree + table, denials in plain words, how to re-verify.
   **Demo depth:** `attenu demo --scenario fanout` (9 agents / 18 tools / every disposition / a strike revocation) and
